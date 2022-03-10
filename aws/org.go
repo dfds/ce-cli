@@ -18,7 +18,7 @@ func OrgAccountListCmd(cmd *cobra.Command, args []string) {
 	}
 }
 
-func OrgAccountList() []types.Account {
+func OrgAccountList(includeAccountIds []string) []types.Account {
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
@@ -40,6 +40,19 @@ func OrgAccountList() []types.Account {
 			log.Fatalf("unable to list accounts, %v", err)
 		}
 		accountList = append(accountList, accountPage.Accounts...)
+	}
+
+	// Filter account list
+	if len(includeAccountIds) > 0 {
+		var filteredAccountList []types.Account
+		for _, v := range accountList {
+			for _, incId := range includeAccountIds {
+				if v.Id == &incId {
+					filteredAccountList = append(filteredAccountList, v)
+				}
+			}
+		}
+		accountList = filteredAccountList
 	}
 
 	return accountList

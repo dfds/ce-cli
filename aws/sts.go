@@ -30,14 +30,16 @@ func AssumeRole(roleArn string) (*types.Credentials, error) {
 
 }
 
-func AssumeRoleMultipleAccounts(accountIds []string) {
+func AssumeRoleMultipleAccounts(accountIds []string) map[string]*types.Credentials {
+
+	assumedRoles := make(map[string]*types.Credentials)
 
 	for _, accountId := range accountIds {
 		roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", accountId, "OrgRole")
 		role, _ := AssumeRole(roleArn)
 		if role != nil {
-			fmt.Println(*role.AccessKeyId)
+			assumedRoles[accountId] = role
 		}
 	}
-
+	return assumedRoles
 }

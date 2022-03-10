@@ -2,7 +2,6 @@ package aws
 
 import (
 	awsCore "github.com/dfds/ce-cli/aws"
-
 	"github.com/spf13/cobra"
 )
 
