@@ -61,12 +61,15 @@ func CreateIAMPolicy(client *iam.Client) *iam.CreatePolicyOutput {
 	policyName := "Inventory"
 	path := "/managed/"
 	description := "Additional policy for doing inventory"
+	var tags []types.Tag
+	tags = append(tags, types.Tag{Key: createString("I like"), Value: createString("big tags")})
 
 	var input *iam.CreatePolicyInput = &iam.CreatePolicyInput{
 		PolicyName:     &policyName,
 		Path:           &path,
 		Description:    &description,
 		PolicyDocument: &policyDocument,
+		Tags:           tags,
 	}
 	resp, err := client.CreatePolicy(context.TODO(), input)
 	if err != nil {
@@ -119,6 +122,8 @@ func CreateIAMPolicy(client *iam.Client) *iam.CreatePolicyOutput {
 
 			}
 
+			// Compare tags
+
 			// Generate policy response
 			resp = &iam.CreatePolicyOutput{
 				Policy: &types.Policy{
@@ -170,6 +175,8 @@ func CreateIAMRole(client *iam.Client) {
     ]
 }`
 	var maxSessionDuration int32 = 3600
+	var tags []types.Tag
+	tags = append(tags, types.Tag{Key: createString("I like"), Value: createString("big tags")})
 
 	var input *iam.CreateRoleInput = &iam.CreateRoleInput{
 		MaxSessionDuration:       &maxSessionDuration,
@@ -177,6 +184,7 @@ func CreateIAMRole(client *iam.Client) {
 		Path:                     &path,
 		RoleName:                 &roleName,
 		Description:              &description,
+		Tags:                     tags,
 	}
 
 	_, err := client.CreateRole(context.TODO(), input)
