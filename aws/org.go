@@ -13,7 +13,10 @@ import (
 )
 
 func OrgAccountListCmd(cmd *cobra.Command, args []string) {
-	for _, v := range OrgAccountList() {
+
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+
+	for _, v := range OrgAccountList(includeAccountIds) {
 		fmt.Println(*v.Id)
 	}
 }
@@ -47,7 +50,7 @@ func OrgAccountList(includeAccountIds []string) []types.Account {
 		var filteredAccountList []types.Account
 		for _, v := range accountList {
 			for _, incId := range includeAccountIds {
-				if v.Id == &incId {
+				if *v.Id == incId {
 					filteredAccountList = append(filteredAccountList, v)
 				}
 			}
