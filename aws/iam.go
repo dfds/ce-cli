@@ -35,6 +35,22 @@ func DefaultTags() []types.Tag {
 	return tags
 }
 
+func DetachRolePolicies(client *iam.Client, name string) {
+
+	attachedPolicies, err := client.ListAttachedRolePolicies(context.TODO(), &iam.ListAttachedRolePoliciesInput{RoleName: &name})
+
+	if err != nil {
+		fmt.Printf("Error listing attached Role Policies: %v\n", err)
+	} else {
+		for _, v := range attachedPolicies.AttachedPolicies {
+			_, err = client.DetachRolePolicy(context.TODO(), &iam.DetachRolePolicyInput{
+				PolicyArn: v.PolicyArn,
+				RoleName:  &name,
+			})
+		}
+	}
+}
+
 func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
@@ -56,9 +72,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 		assumedClient := iam.NewFromConfig(cfg)
 
 		DeleteIAMRole(assumedClient)
-		// inventoryPolicy := CreateIAMPolicy(assumedClient)
-		// AttachIAMPolicy(assumedClient, "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess", "Inventory")
-		// AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, "Inventory")
+		DeleteIAMPolicy(assumedClient)
 	}
 
 }
@@ -180,10 +194,31 @@ func CreateIAMPolicy(client *iam.Client) *iam.CreatePolicyOutput {
 	}
 
 	// ensure tags on the policy are replaced with those provided
-	err = ReplacePolicyTags(client, policyName, path)
+	_ = ReplacePolicyTags(client, policyName, path)
 
 	return resp
 
+}
+
+func GetPolicyArn(client *iam.Client, name string, path string) (*string, error) {
+
+	var arn *string
+
+	// search for policy using path and name to retrieve the ARN
+	policies, err := client.ListPolicies(context.TODO(), &iam.ListPoliciesInput{
+		PathPrefix: &path,
+	})
+	if err != nil {
+		fmt.Printf("Could not list policies: %v\n", err)
+	} else {
+		for _, v := range policies.Policies {
+			if *v.Path == path && *v.PolicyName == name {
+				arn = v.Arn
+			}
+		}
+	}
+
+	return arn, err
 }
 
 func ReplacePolicyTags(client *iam.Client, name string, path string) error {
@@ -192,48 +227,45 @@ func ReplacePolicyTags(client *iam.Client, name string, path string) error {
 
 	tags := DefaultTags()
 
-	// search for policy using path and name to retrieve the ARN
-	managedPolicies, err := client.ListPolicies(context.TODO(), &iam.ListPoliciesInput{
-		PathPrefix: &path,
-	})
-	if err != nil {
-		fmt.Printf("Could not list policies: %v\n", err)
-	}
-	var policyArn *string
-	for _, v := range managedPolicies.Policies {
-		if *v.Path == path && *v.PolicyName == name {
-			policyArn = v.Arn
-		}
-	}
+	arn, err := GetPolicyArn(client, name, path)
 
-	// get the policy and note current tags
-	policy, err := client.GetPolicy(context.TODO(), &iam.GetPolicyInput{PolicyArn: policyArn})
 	if err != nil {
-		fmt.Printf("Cannot get policy %s: %v\n", *policyArn, err)
+		// error occurred when trying to retrieve policy arn
+		fmt.Printf("GetPolicyArn Error: %v\n", err)
 	} else {
-		for _, v := range policy.Policy.Tags {
-			currentTags = append(currentTags, *v.Key)
-		}
-	}
+		if arn != nil {
+			// get the policy and note current tags
+			policy, err := client.GetPolicy(context.TODO(), &iam.GetPolicyInput{PolicyArn: arn})
+			if err != nil {
+				fmt.Printf("Cannot get policy %s: %v\n", *arn, err)
+			} else {
+				for _, v := range policy.Policy.Tags {
+					currentTags = append(currentTags, *v.Key)
+				}
+			}
 
-	// remove existing tags
-	if len(currentTags) != 0 {
-		_, err = client.UntagPolicy(context.TODO(), &iam.UntagPolicyInput{
-			PolicyArn: policyArn,
-			TagKeys:   currentTags,
-		})
-		if err != nil {
-			fmt.Printf("UntagPolicy Err: %v\n", err)
-		}
-	}
+			// remove existing tags
+			if len(currentTags) != 0 {
+				_, err = client.UntagPolicy(context.TODO(), &iam.UntagPolicyInput{
+					PolicyArn: arn,
+					TagKeys:   currentTags,
+				})
+				if err != nil {
+					fmt.Printf("UntagPolicy Err: %v\n", err)
+				}
+			}
 
-	// apply the correct tags
-	_, err = client.TagPolicy(context.TODO(), &iam.TagPolicyInput{
-		PolicyArn: policyArn,
-		Tags:      tags,
-	})
-	if err != nil {
-		fmt.Printf("TagPolicy Err: %v\n", err)
+			// apply the correct tags
+			_, err = client.TagPolicy(context.TODO(), &iam.TagPolicyInput{
+				PolicyArn: arn,
+				Tags:      tags,
+			})
+			if err != nil {
+				fmt.Printf("TagPolicy Err: %v\n", err)
+			}
+		} else {
+			fmt.Printf("Empty ARN Returned: %v\n", err)
+		}
 	}
 
 	// just return nil for now (the best error handling)
@@ -298,6 +330,39 @@ func AttachIAMPolicy(client *iam.Client, policyArn string, roleName string) {
 }
 
 func DeleteIAMRole(client *iam.Client) {
+
+	fmt.Println("DeleteIAMRole Executed!!!")
+	name := "Inventory"
+
+	DetachRolePolicies(client, name)
+
+	_, err := client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &name})
+
+	if err != nil {
+		fmt.Printf("Error when executing DeleteRole: %v\n", err)
+	}
+
+}
+
+func DeleteIAMPolicy(client *iam.Client) {
+
+	fmt.Println("DeleteIAMPolicy Executed!!!")
+
+	name := "Inventory"
+	path := "/managed/"
+
+	arn, err := GetPolicyArn(client, name, path)
+
+	if err != nil {
+		fmt.Printf("Error retrieving Policy ARN: %v\n", err)
+	} else {
+		_, err := client.DeletePolicy(context.TODO(), &iam.DeletePolicyInput{PolicyArn: arn})
+
+		if err != nil {
+			fmt.Printf("Error deleting Policy: %v\n", err)
+		}
+	}
+
 }
 
 func CreateIAMRole(client *iam.Client) {

@@ -22,7 +22,7 @@ func AssumeRole(roleArn string) (*types.Credentials, error) {
 
 	assumedRole, err := stsClient.AssumeRole(context.TODO(), &sts.AssumeRoleInput{RoleArn: &roleArn, RoleSessionName: &roleSessionName})
 	if err != nil {
-		log.Println("unable to assume role %s, %v", roleArn, err)
+		log.Printf("unable to assume role %s, %v", roleArn, err)
 		return nil, err
 	}
 
