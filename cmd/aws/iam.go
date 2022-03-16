@@ -13,3 +13,12 @@ var IamRoleCreateCmd = &cobra.Command{
 		awsCore.CreateIAMRoleCmd(cmd, args)
 	},
 }
+
+var IamRoleDeleteCmd = &cobra.Command{
+	Use:   "delete-iam-role",
+	Short: "Delete IAM role",
+	// Long:  `All software has versions. This is Hugo's`,
+	Run: func(cmd *cobra.Command, args []string) {
+		awsCore.DeleteIAMRoleCmd(cmd, args)
+	},
+}
