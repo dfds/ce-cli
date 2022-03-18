@@ -83,12 +83,10 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	var waitGroup sync.WaitGroup
-	sem := semaphore.NewWeighted(3)
+	sem := semaphore.NewWeighted(10)
 	ctx := context.TODO()
 
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	fmt.Println("Cobra?")
-	fmt.Println(includeAccountIds)
 
 	accounts := OrgAccountList(includeAccountIds)
 	var ids []string
