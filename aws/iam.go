@@ -56,12 +56,14 @@ func DetachRolePolicies(client *iam.Client, name string) {
 
 func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
+	// get parameters from Cobra
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+
 	var waitGroup sync.WaitGroup
-	sem := semaphore.NewWeighted(10)
+	sem := semaphore.NewWeighted(concurrentOps)
 	ctx := context.TODO()
 	startTime := time.Now()
-
-	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
 
 	accounts := OrgAccountList(includeAccountIds)
 	var ids []string
@@ -96,16 +98,19 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	waitGroup.Wait()
 
-	fmt.Printf("Took %f seconds to complete.", time.Since(startTime).Seconds())
+	fmt.Printf("Took %f seconds to complete deletion.", time.Since(startTime).Seconds())
 }
 
 func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
-	var waitGroup sync.WaitGroup
-	sem := semaphore.NewWeighted(10)
-	ctx := context.TODO()
-
+	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+
+	var waitGroup sync.WaitGroup
+	sem := semaphore.NewWeighted(concurrentOps)
+	ctx := context.TODO()
+	startTime := time.Now()
 
 	accounts := OrgAccountList(includeAccountIds)
 	var ids []string
@@ -142,6 +147,7 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	waitGroup.Wait()
 
+	fmt.Printf("Took %f seconds to complete creation.", time.Since(startTime).Seconds())
 }
 
 func CreateIAMPolicy(client *iam.Client) *iam.CreatePolicyOutput {

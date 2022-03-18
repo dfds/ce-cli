@@ -22,3 +22,8 @@ var IamRoleDeleteCmd = &cobra.Command{
 		awsCore.DeleteIAMRoleCmd(cmd, args)
 	},
 }
+
+func IamInit() {
+	// Emilcat
+	IamRoleDeleteCmd.PersistentFlags().StringP("rolename", "r", "string", "Account IDs to target.")
+}

@@ -14,12 +14,14 @@ var awsCmd = &cobra.Command{
 
 func awsInit() {
 	// Emilcat
-	awsCmd.PersistentFlags().StringSliceP("include-account-ids", "i", []string{}, "Help text here?")
+	awsCmd.PersistentFlags().StringSliceP("include-account-ids", "i", []string{}, "Account IDs to target.")
+	awsCmd.PersistentFlags().Int64P("concurrent-operations", "c", 10, "Maximum number of concurrent operations.")
 
 	// Organizations
 	awsCmd.AddCommand(aws.OrgAccountListCmd)
 
 	// IAM
+	aws.IamInit()
 	awsCmd.AddCommand(aws.IamRoleCreateCmd)
 	awsCmd.AddCommand(aws.IamRoleDeleteCmd)
 }
