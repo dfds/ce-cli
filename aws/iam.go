@@ -356,7 +356,27 @@ func DeleteIAMPolicy(client *iam.Client) {
 	if err != nil {
 		fmt.Printf("Error retrieving Policy ARN: %v\n", err)
 	} else {
-		_, err := client.DeletePolicy(context.TODO(), &iam.DeletePolicyInput{PolicyArn: arn})
+		policyVersions, err := client.ListPolicyVersions(context.TODO(), &iam.ListPolicyVersionsInput{PolicyArn: arn})
+
+		if err != nil {
+			fmt.Printf("ListPolicyVersions Error: %v\n", err)
+		}
+
+		// delete all policy versions except the default
+		for _, v := range policyVersions.Versions {
+			if v.IsDefaultVersion == false {
+				_, err = client.DeletePolicyVersion(context.TODO(), &iam.DeletePolicyVersionInput{
+					PolicyArn: arn,
+					VersionId: v.VersionId})
+			}
+
+			if err != nil {
+				fmt.Printf("DeletePolicyVersion Error: %v\n", err)
+			}
+		}
+
+		// delete policy (and the default version)
+		_, err = client.DeletePolicy(context.TODO(), &iam.DeletePolicyInput{PolicyArn: arn})
 
 		if err != nil {
 			fmt.Printf("Error deleting Policy: %v\n", err)
