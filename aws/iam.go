@@ -46,7 +46,7 @@ func DetachRolePolicies(client *iam.Client, name string) {
 		fmt.Printf("Error listing attached Role Policies: %v\n", err)
 	} else {
 		for _, v := range attachedPolicies.AttachedPolicies {
-			_, err = client.DetachRolePolicy(context.TODO(), &iam.DetachRolePolicyInput{
+			client.DetachRolePolicy(context.TODO(), &iam.DetachRolePolicyInput{
 				PolicyArn: v.PolicyArn,
 				RoleName:  &name,
 			})
@@ -55,6 +55,11 @@ func DetachRolePolicies(client *iam.Client, name string) {
 }
 
 func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
+
+	var waitGroup sync.WaitGroup
+	sem := semaphore.NewWeighted(10)
+	ctx := context.TODO()
+	startTime := time.Now()
 
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
 
@@ -65,19 +70,33 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 	}
 	assumedRoles := AssumeRoleMultipleAccounts(ids)
 
-	for _, creds := range assumedRoles {
+	for id, creds := range assumedRoles {
 
-		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
-		if err != nil {
-			log.Fatalf("unable to load SDK config, %v", err)
-		}
+		waitGroup.Add(1)
 
-		assumedClient := iam.NewFromConfig(cfg)
+		go func(id string, creds *ststypes.Credentials) {
 
-		DeleteIAMRole(assumedClient)
-		DeleteIAMPolicy(assumedClient)
+			fmt.Printf("Deleting Role in Account %s\n", id)
+			sem.Acquire(ctx, 1)
+			defer sem.Release(1)
+			defer waitGroup.Done()
+
+			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+			if err != nil {
+				log.Fatalf("unable to load SDK config, %v", err)
+			}
+
+			assumedClient := iam.NewFromConfig(cfg)
+
+			DeleteIAMRole(assumedClient)
+			DeleteIAMPolicy(assumedClient)
+			fmt.Printf("Role deletion complete in Account %s\n", id)
+		}(id, creds)
 	}
 
+	waitGroup.Wait()
+
+	fmt.Printf("Took %f seconds to complete.", time.Since(startTime).Seconds())
 }
 
 func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
@@ -351,7 +370,6 @@ func AttachIAMPolicy(client *iam.Client, policyArn string, roleName string) {
 
 func DeleteIAMRole(client *iam.Client) {
 
-	fmt.Println("DeleteIAMRole Executed!!!")
 	name := "Inventory"
 
 	DetachRolePolicies(client, name)
@@ -365,8 +383,6 @@ func DeleteIAMRole(client *iam.Client) {
 }
 
 func DeleteIAMPolicy(client *iam.Client) {
-
-	fmt.Println("DeleteIAMPolicy Executed!!!")
 
 	name := "Inventory"
 	path := "/managed/"
@@ -384,7 +400,7 @@ func DeleteIAMPolicy(client *iam.Client) {
 
 			// delete all policy versions except the default
 			for _, v := range policyVersions.Versions {
-				if v.IsDefaultVersion == false {
+				if !v.IsDefaultVersion {
 					_, err = client.DeletePolicyVersion(context.TODO(), &iam.DeletePolicyVersionInput{
 						PolicyArn: arn,
 						VersionId: v.VersionId})
