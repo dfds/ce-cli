@@ -36,7 +36,10 @@ func AssumeRoleMultipleAccounts(accountIds []string) map[string]*types.Credentia
 
 	for _, accountId := range accountIds {
 		roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", accountId, "OrgRole")
-		role, _ := AssumeRole(roleArn)
+		role, err := AssumeRole(roleArn)
+		if err != nil {
+			fmt.Printf("Role Assummption Error: %v\n", err)
+		}
 		if role != nil {
 			assumedRoles[accountId] = role
 		}

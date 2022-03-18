@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"sync"
 	"time"
 
 	// "github.com/dfds/ce-cli/aws"
@@ -14,6 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	ststypes "github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/spf13/cobra"
 )
@@ -79,7 +82,13 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
+	var waitGroup sync.WaitGroup
+	sem := semaphore.NewWeighted(3)
+	ctx := context.TODO()
+
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	fmt.Println("Cobra?")
+	fmt.Println(includeAccountIds)
 
 	accounts := OrgAccountList(includeAccountIds)
 	var ids []string
@@ -88,20 +97,33 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 	}
 	assumedRoles := AssumeRoleMultipleAccounts(ids)
 
-	for _, creds := range assumedRoles {
+	for id, creds := range assumedRoles {
 
-		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
-		if err != nil {
-			log.Fatalf("unable to load SDK config, %v", err)
-		}
+		waitGroup.Add(1)
 
-		assumedClient := iam.NewFromConfig(cfg)
+		go func(id string, creds *ststypes.Credentials) {
 
-		inventoryPolicy := CreateIAMPolicy(assumedClient)
-		CreateIAMRole(assumedClient)
-		AttachIAMPolicy(assumedClient, "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess", "Inventory")
-		AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, "Inventory")
+			fmt.Printf("Creating Role in Account %s\n", id)
+			sem.Acquire(ctx, 1)
+			defer sem.Release(1)
+			defer waitGroup.Done()
+
+			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+			if err != nil {
+				log.Fatalf("unable to load SDK config, %v", err)
+			}
+
+			assumedClient := iam.NewFromConfig(cfg)
+
+			inventoryPolicy := CreateIAMPolicy(assumedClient)
+			CreateIAMRole(assumedClient)
+			AttachIAMPolicy(assumedClient, "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess", "Inventory")
+			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, "Inventory")
+			fmt.Printf("Role creation complete in Account %s\n", id)
+		}(id, creds)
 	}
+
+	waitGroup.Wait()
 
 }
 
@@ -360,18 +382,19 @@ func DeleteIAMPolicy(client *iam.Client) {
 
 		if err != nil {
 			fmt.Printf("ListPolicyVersions Error: %v\n", err)
-		}
+		} else {
 
-		// delete all policy versions except the default
-		for _, v := range policyVersions.Versions {
-			if v.IsDefaultVersion == false {
-				_, err = client.DeletePolicyVersion(context.TODO(), &iam.DeletePolicyVersionInput{
-					PolicyArn: arn,
-					VersionId: v.VersionId})
-			}
+			// delete all policy versions except the default
+			for _, v := range policyVersions.Versions {
+				if v.IsDefaultVersion == false {
+					_, err = client.DeletePolicyVersion(context.TODO(), &iam.DeletePolicyVersionInput{
+						PolicyArn: arn,
+						VersionId: v.VersionId})
+				}
 
-			if err != nil {
-				fmt.Printf("DeletePolicyVersion Error: %v\n", err)
+				if err != nil {
+					fmt.Printf("DeletePolicyVersion Error: %v\n", err)
+				}
 			}
 		}
 
