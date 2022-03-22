@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -16,107 +17,71 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 	ststypes "github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"github.com/fatih/color"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/spf13/cobra"
 )
-
-func DefaultTags() []types.Tag {
-
-	var tags []types.Tag
-
-	tags = append(tags, types.Tag{
-		Key:   createString("managedBy"),
-		Value: createString("ce-cli"),
-	})
-
-	tags = append(tags, types.Tag{
-		Key:   createString("lastUpdated"),
-		Value: createString(time.Now().UTC().Format(time.RFC3339)),
-	})
-
-	return tags
-}
-
-func DetachRolePolicies(client *iam.Client, name string) {
-
-	attachedPolicies, err := client.ListAttachedRolePolicies(context.TODO(), &iam.ListAttachedRolePoliciesInput{RoleName: &name})
-
-	if err != nil {
-		fmt.Printf("Error listing attached Role Policies: %v\n", err)
-	} else {
-		for _, v := range attachedPolicies.AttachedPolicies {
-			client.DetachRolePolicy(context.TODO(), &iam.DetachRolePolicyInput{
-				PolicyArn: v.PolicyArn,
-				RoleName:  &name,
-			})
-		}
-	}
-}
-
-func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
-
-	// get parameters from Cobra
-	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
-
-	var waitGroup sync.WaitGroup
-	sem := semaphore.NewWeighted(concurrentOps)
-	ctx := context.TODO()
-	startTime := time.Now()
-
-	accounts := OrgAccountList(includeAccountIds)
-	var ids []string
-	for _, v := range accounts {
-		ids = append(ids, *v.Id)
-	}
-	assumedRoles := AssumeRoleMultipleAccounts(ids)
-
-	for id, creds := range assumedRoles {
-
-		waitGroup.Add(1)
-
-		go func(id string, creds *ststypes.Credentials) {
-
-			fmt.Printf("Deleting Role in Account %s\n", id)
-			sem.Acquire(ctx, 1)
-			defer sem.Release(1)
-			defer waitGroup.Done()
-
-			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
-			if err != nil {
-				log.Fatalf("unable to load SDK config, %v", err)
-			}
-
-			assumedClient := iam.NewFromConfig(cfg)
-
-			DeleteIAMRole(assumedClient)
-			DeleteIAMPolicy(assumedClient)
-			fmt.Printf("Role deletion complete in Account %s\n", id)
-		}(id, creds)
-	}
-
-	waitGroup.Wait()
-
-	fmt.Printf("Took %f seconds to complete deletion.", time.Since(startTime).Seconds())
-}
 
 func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+	path, _ := cmd.Flags().GetString("path")
+	roleName, _ := cmd.Flags().GetString("role-name")
+	roleDescription, _ := cmd.Flags().GetString("role-description")
+	policyName, _ := cmd.Flags().GetString("policy-name")
+	policyFile, _ := cmd.Flags().GetString("policy-file")
+	policyAssumptionFile, _ := cmd.Flags().GetString("assumption-file")
+	policyDescription, _ := cmd.Flags().GetString("policy-description")
+	maxSessionDuration, _ := cmd.Flags().GetInt32("max-session-duration")
+
+	// we need to validate that the policy file exists and has valid content so invoke a function to
+	// do this now
+	policyData, err := LoadJSONFileAsString(policyFile)
+	if err != nil {
+		color.Set(color.FgRed)
+		fmt.Println("The JSON file specified for the Policy could not be loaded.")
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	assumptionData, err := LoadJSONFileAsString(policyAssumptionFile)
+	if err != nil {
+		color.Set(color.FgRed)
+		fmt.Println("The JSON file specified for the Role Trust Relationship could not be loaded.")
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// use roleName as the policyName too if it's not specified via parameters
+	if policyName == "" {
+		policyName = roleName
+	}
 
 	var waitGroup sync.WaitGroup
 	sem := semaphore.NewWeighted(concurrentOps)
 	ctx := context.TODO()
+	var ids []string
 	startTime := time.Now()
 
-	accounts := OrgAccountList(includeAccountIds)
-	var ids []string
-	for _, v := range accounts {
-		ids = append(ids, *v.Id)
+	// get list of org accounts
+	color.Set(color.FgWhite)
+	fmt.Printf("Obtaining a list of Organizational Accounts: ")
+	accounts, err := OrgAccountList(includeAccountIds)
+	if err != nil {
+		color.Red("Failed")
+		color.Yellow("  Error: %v", err)
+		os.Exit(1)
+	} else {
+		for _, v := range accounts {
+			ids = append(ids, *v.Id)
+		}
+		color.Green("Done")
 	}
+
+	// assume roles in org accounts
 	assumedRoles := AssumeRoleMultipleAccounts(ids)
 
 	for id, creds := range assumedRoles {
@@ -125,7 +90,8 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 		go func(id string, creds *ststypes.Credentials) {
 
-			fmt.Printf("Creating Role in Account %s\n", id)
+			color.Set(color.FgWhite)
+			fmt.Printf(" Account ID %s: Creating the Role named '%s'\n", id, roleName)
 			sem.Acquire(ctx, 1)
 			defer sem.Release(1)
 			defer waitGroup.Done()
@@ -137,11 +103,13 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			assumedClient := iam.NewFromConfig(cfg)
 
-			inventoryPolicy := CreateIAMPolicy(assumedClient)
-			CreateIAMRole(assumedClient)
-			AttachIAMPolicy(assumedClient, "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess", "Inventory")
-			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, "Inventory")
-			fmt.Printf("Role creation complete in Account %s\n", id)
+			inventoryPolicy := CreateIAMPolicy(assumedClient, policyName, policyData, path, policyDescription)
+			CreateIAMRole(assumedClient, roleName, path, assumptionData, roleDescription, maxSessionDuration)
+			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, roleName)
+
+			color.Set(color.FgGreen)
+			fmt.Printf(" Account ID %s: Role creation complete\n", id)
+			color.Unset()
 		}(id, creds)
 	}
 
@@ -150,22 +118,7 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 	fmt.Printf("Took %f seconds to complete creation.", time.Since(startTime).Seconds())
 }
 
-func CreateIAMPolicy(client *iam.Client) *iam.CreatePolicyOutput {
-
-	policyDocument := `{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "CloudEngineeringCLI",
-            "Effect": "Allow",
-            "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::mynewbucket"
-        }
-    ]
-}`
-	policyName := "Inventory"
-	path := "/managed/"
-	description := "Additional policy for doing inventory"
+func CreateIAMPolicy(client *iam.Client, policyName string, policyDocument string, path string, description string) *iam.CreatePolicyOutput {
 
 	var input *iam.CreatePolicyInput = &iam.CreatePolicyInput{
 		PolicyName:     &policyName,
@@ -243,6 +196,121 @@ func CreateIAMPolicy(client *iam.Client) *iam.CreatePolicyOutput {
 
 	return resp
 
+}
+
+func DefaultTags() []types.Tag {
+
+	var tags []types.Tag
+
+	tags = append(tags, types.Tag{
+		Key:   createString("managedBy"),
+		Value: createString("ce-cli"),
+	})
+
+	tags = append(tags, types.Tag{
+		Key:   createString("lastUpdated"),
+		Value: createString(time.Now().UTC().Format(time.RFC3339)),
+	})
+
+	return tags
+}
+
+func DetachRolePolicies(client *iam.Client, name string) {
+
+	attachedPolicies, err := client.ListAttachedRolePolicies(context.TODO(), &iam.ListAttachedRolePoliciesInput{RoleName: &name})
+
+	if err != nil {
+		fmt.Printf("Error listing attached Role Policies: %v\n", err)
+	} else {
+		for _, v := range attachedPolicies.AttachedPolicies {
+			client.DetachRolePolicy(context.TODO(), &iam.DetachRolePolicyInput{
+				PolicyArn: v.PolicyArn,
+				RoleName:  &name,
+			})
+		}
+	}
+}
+
+func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
+
+	// get parameters from Cobra
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	path, _ := cmd.Flags().GetString("path")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+	roleName, _ := cmd.Flags().GetString("role-name")
+	policyName, _ := cmd.Flags().GetString("policy-name")
+
+	if policyName == "" {
+		policyName = roleName
+	}
+
+	if roleName == "" {
+		fmt.Println("No Role Name was specified.")
+	} else {
+		var waitGroup sync.WaitGroup
+		sem := semaphore.NewWeighted(concurrentOps)
+		ctx := context.TODO()
+		var ids []string
+		startTime := time.Now()
+
+		// get list of org accounts
+		color.Set(color.FgWhite)
+		fmt.Printf("Obtaining a list of Organizational Accounts: ")
+		accounts, err := OrgAccountList(includeAccountIds)
+		if err != nil {
+			color.Red("Failed")
+			color.Yellow("  Error: %v", err)
+			os.Exit(1)
+		} else {
+			for _, v := range accounts {
+				ids = append(ids, *v.Id)
+			}
+			color.Green("Done")
+		}
+
+		// // get list of all Org Accounts
+		// accounts, err := OrgAccountList(includeAccountIds)
+
+		// if err != nil {
+		// 	color.Red("Failed")
+		// 	color.Yellow("Error: %v\n", err)
+		// }
+
+		// var ids []string
+		// for _, v := range accounts {
+		// 	ids = append(ids, *v.Id)
+		// }
+
+		assumedRoles := AssumeRoleMultipleAccounts(ids)
+
+		for id, creds := range assumedRoles {
+
+			waitGroup.Add(1)
+
+			go func(id string, creds *ststypes.Credentials) {
+
+				fmt.Printf("Deleting the Role '%s' in Account %s\n", roleName, id)
+				sem.Acquire(ctx, 1)
+				defer sem.Release(1)
+				defer waitGroup.Done()
+
+				cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+				if err != nil {
+					log.Fatalf("unable to load SDK config, %v", err)
+				}
+
+				assumedClient := iam.NewFromConfig(cfg)
+
+				DeleteIAMRole(assumedClient, roleName)
+				DeleteIAMPolicy(assumedClient, policyName, path)
+				fmt.Printf("Role deletion complete in Account %s\n", id)
+			}(id, creds)
+		}
+
+		waitGroup.Wait()
+
+		fmt.Printf("Took %f seconds to complete deletion.", time.Since(startTime).Seconds())
+	}
 }
 
 func GetPolicyArn(client *iam.Client, name string, path string) (*string, error) {
@@ -374,13 +442,11 @@ func AttachIAMPolicy(client *iam.Client, policyArn string, roleName string) {
 
 }
 
-func DeleteIAMRole(client *iam.Client) {
+func DeleteIAMRole(client *iam.Client, roleName string) {
 
-	name := "Inventory"
+	DetachRolePolicies(client, roleName)
 
-	DetachRolePolicies(client, name)
-
-	_, err := client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &name})
+	_, err := client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &roleName})
 
 	if err != nil {
 		fmt.Printf("Error when executing DeleteRole: %v\n", err)
@@ -388,16 +454,15 @@ func DeleteIAMRole(client *iam.Client) {
 
 }
 
-func DeleteIAMPolicy(client *iam.Client) {
+func DeleteIAMPolicy(client *iam.Client, policyName string, path string) {
 
-	name := "Inventory"
-	path := "/managed/"
-
-	arn, err := GetPolicyArn(client, name, path)
+	// get the ARN for the policy
+	arn, err := GetPolicyArn(client, policyName, path)
 
 	if err != nil {
 		fmt.Printf("Error retrieving Policy ARN: %v\n", err)
 	} else {
+		// get policy versions
 		policyVersions, err := client.ListPolicyVersions(context.TODO(), &iam.ListPolicyVersionsInput{PolicyArn: arn})
 
 		if err != nil {
@@ -428,29 +493,13 @@ func DeleteIAMPolicy(client *iam.Client) {
 
 }
 
-func CreateIAMRole(client *iam.Client) {
-	roleName := "Inventory"
-	path := "/managed/"
-	description := "Role for inventory scans"
-	assumeRolePolicyDocument := `{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "Service": "ec2.amazonaws.com"
-            },
-            "Action": "sts:AssumeRole"
-        }
-    ]
-}`
-	var maxSessionDuration int32 = 3600
+func CreateIAMRole(client *iam.Client, rolename string, path string, assumeRolePolicyDocument string, description string, maxSessionDuration int32) {
 
 	var input *iam.CreateRoleInput = &iam.CreateRoleInput{
 		MaxSessionDuration:       &maxSessionDuration,
 		AssumeRolePolicyDocument: &assumeRolePolicyDocument,
 		Path:                     &path,
-		RoleName:                 &roleName,
+		RoleName:                 &rolename,
 		Description:              &description,
 	}
 
@@ -458,13 +507,13 @@ func CreateIAMRole(client *iam.Client) {
 	if err != nil {
 		var eae *types.EntityAlreadyExistsException
 		if errors.As(err, &eae) {
-			log.Printf("Warning: Role '%s' already exists\n", roleName)
+			log.Printf("Warning: Role '%s' already exists\n", rolename)
 		} else {
 			fmt.Printf("err: %v\n", err)
 		}
 	}
 
 	// replace tags associated with the role
-	_ = ReplaceRoleTags(client, roleName, path)
+	_ = ReplaceRoleTags(client, rolename, path)
 
 }
