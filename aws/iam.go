@@ -123,7 +123,9 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	waitGroup.Wait()
 
+	color.Set(color.FgCyan)
 	fmt.Printf("\nTook %f seconds to complete Role creation.\n", time.Since(startTime).Seconds())
+	color.Unset()
 }
 
 func CreateIAMPolicy(client *iam.Client, id string, policyName string, policyDocument string, path string, description string) (*iam.CreatePolicyOutput, error) {
@@ -257,12 +259,13 @@ func CheckRoleExists(client *iam.Client, name string) (bool, error) {
 
 }
 
-func DetachRolePolicies(client *iam.Client, name string) {
+func DetachRolePolicies(client *iam.Client, name string) error {
 
 	attachedPolicies, err := client.ListAttachedRolePolicies(context.TODO(), &iam.ListAttachedRolePoliciesInput{RoleName: &name})
 
+	// if an error occurred with the last invocation then return the error
 	if err != nil {
-		fmt.Printf("Error listing attached Role Policies: %v\n", err)
+		return err
 	} else {
 		for _, v := range attachedPolicies.AttachedPolicies {
 			client.DetachRolePolicy(context.TODO(), &iam.DetachRolePolicyInput{
@@ -271,6 +274,9 @@ func DetachRolePolicies(client *iam.Client, name string) {
 			})
 		}
 	}
+
+	// return err; this should be nil at this point
+	return err
 }
 
 func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
@@ -318,7 +324,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			go func(id string, creds *ststypes.Credentials) {
 
-				fmt.Printf(" Account ID %s: Deleting the Role named '%s'\n", roleName, id)
+				fmt.Printf(" Account ID %s: Deleting the Role named '%s'\n", id, roleName)
 				sem.Acquire(ctx, 1)
 				defer sem.Release(1)
 				defer waitGroup.Done()
@@ -330,10 +336,17 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 				assumedClient := iam.NewFromConfig(cfg)
 
-				if DeleteIAMRole(assumedClient, roleName) {
+				roleExists, err := CheckRoleExists(assumedClient, roleName)
+
+				if roleExists {
+					DeleteIAMRole(assumedClient, roleName)
 					DeleteIAMPolicy(assumedClient, policyName, path)
 					color.Set(color.FgGreen)
 					fmt.Printf(" Account ID %s: Role deletion complete\n", id)
+					color.Unset()
+				} else {
+					color.Set(color.FgYellow)
+					fmt.Printf(" Account ID %s: (WARN) The Role named '%s' was not found.\n", id, roleName)
 					color.Unset()
 				}
 			}(id, creds)
@@ -341,7 +354,9 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 		waitGroup.Wait()
 
-		fmt.Printf("Took %f seconds to complete deletion.", time.Since(startTime).Seconds())
+		color.Set(color.FgCyan)
+		fmt.Printf("\nTook %f seconds to complete deletion.\n", time.Since(startTime).Seconds())
+		color.Unset()
 	}
 }
 
@@ -476,12 +491,12 @@ func AttachIAMPolicy(client *iam.Client, policyArn string, roleName string) {
 
 func DeleteIAMRole(client *iam.Client, roleName string) bool {
 
-	roleExists, err := CheckRoleExists(client, roleName)
+	// try to detach policies
+	err := DetachRolePolicies(client, roleName)
 
-	if roleExists {
-		DetachRolePolicies(client, roleName)
-
-		_, err := client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &roleName})
+	// if the detach of policies succeeded then...
+	if err == nil {
+		_, err = client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &roleName})
 
 		if err != nil {
 			fmt.Printf("Error when executing DeleteRole: %v\n", err)
@@ -490,15 +505,9 @@ func DeleteIAMRole(client *iam.Client, roleName string) bool {
 			return true
 		}
 	} else {
-		var nsu *types.NoSuchEntityException
-		if errors.As(err, &nsu) {
-			fmt.Println("The specified Role could not be found.")
-		} else {
-			fmt.Println("An error occurred whilst trying to identify if the Role exists in the target acccount.")
-			fmt.Printf("The error was: %v", err)
-		}
 		return false
 	}
+
 }
 
 func DeleteIAMPolicy(client *iam.Client, policyName string, path string) {
