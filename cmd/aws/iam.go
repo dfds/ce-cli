@@ -24,6 +24,18 @@ var IamRoleDeleteCmd = &cobra.Command{
 }
 
 func IamInit() {
-	// Emilcat
-	IamRoleDeleteCmd.PersistentFlags().StringP("rolename", "r", "string", "Account IDs to target.")
+
+	// define parameters input for IamRoleCreateCmd functionality
+	IamRoleCreateCmd.PersistentFlags().StringP("role-name", "r", "", "Name to assign to the new role.")
+	IamRoleCreateCmd.PersistentFlags().StringP("policy-name", "p", "", "Name to use for the Policy assigned to the new role.  If not provided the name of the Role will be reused.")
+	IamRoleCreateCmd.PersistentFlags().StringP("policy-file", "f", "", "The path to a JSON file which holds the Policy document.")
+	IamRoleCreateCmd.PersistentFlags().StringP("assumption-file", "a", "", "The path to a JSON file which holds the Role Assumption document.")
+	IamRoleCreateCmd.PersistentFlags().StringP("role-description", "d", "", "A description that will be attached to the created Role.")
+	IamRoleCreateCmd.PersistentFlags().StringP("policy-description", "o", "", "A description that will be attached to the created Policy.")
+	IamRoleCreateCmd.PersistentFlags().Int32P("max-session-duration", "m", 3600, "The number of minutes that an assumed role will be valid for.")
+
+	// define parameters input for IamRoleDeleteCmd functionality
+	IamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "Name to assign to the new role.")
+	IamRoleDeleteCmd.PersistentFlags().StringP("policy-name", "p", "", "Name to use for the Policy assigned to the new role.  If not provided the name of the Role will be reused.")
+
 }

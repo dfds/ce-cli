@@ -3,7 +3,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/organizations"
@@ -16,16 +15,26 @@ func OrgAccountListCmd(cmd *cobra.Command, args []string) {
 
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
 
-	for _, v := range OrgAccountList(includeAccountIds) {
-		fmt.Println(*v.Id)
+	accountList, err := OrgAccountList(includeAccountIds)
+
+	if err != nil {
+		fmt.Println("Ooops!!")
+	} else {
+		for _, v := range accountList {
+			fmt.Println(*v.Id)
+		}
 	}
 }
 
-func OrgAccountList(includeAccountIds []string) []types.Account {
+func OrgAccountList(includeAccountIds []string) ([]types.Account, error) {
 
+	// try to create a default config instance
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+
+	// in the event of an issue return nil output and the error; it's expected that the caller will handle
+	// the error
 	if err != nil {
-		log.Fatalf("unable to load SDK config, %v", err)
+		return nil, err
 	}
 
 	svc := organizations.NewFromConfig(cfg)
@@ -34,14 +43,14 @@ func OrgAccountList(includeAccountIds []string) []types.Account {
 
 	accountPage, err := svc.ListAccounts(context.TODO(), &organizations.ListAccountsInput{NextToken: nil})
 	if err != nil {
-		log.Fatalf("unable to list accounts, %v", err)
+		return nil, err
 	}
 	accountList = append(accountList, accountPage.Accounts...)
 
 	for accountPage.NextToken != nil {
 		accountPage, err = svc.ListAccounts(context.TODO(), &organizations.ListAccountsInput{NextToken: accountPage.NextToken})
 		if err != nil {
-			log.Fatalf("unable to list accounts, %v", err)
+			return nil, err
 		}
 		accountList = append(accountList, accountPage.Accounts...)
 	}
@@ -59,6 +68,6 @@ func OrgAccountList(includeAccountIds []string) []types.Account {
 		accountList = filteredAccountList
 	}
 
-	return accountList
-
+	// return the accounts list and no error
+	return accountList, nil
 }

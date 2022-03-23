@@ -10,13 +10,12 @@ import (
 	"sync"
 	"time"
 
-	// "github.com/dfds/ce-cli/aws"
-
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 	ststypes "github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"github.com/dfds/ce-cli/util"
 	"github.com/fatih/color"
 	"golang.org/x/sync/semaphore"
 
@@ -33,13 +32,12 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 	roleDescription, _ := cmd.Flags().GetString("role-description")
 	policyName, _ := cmd.Flags().GetString("policy-name")
 	policyFile, _ := cmd.Flags().GetString("policy-file")
-	policyAssumptionFile, _ := cmd.Flags().GetString("assumption-file")
+	roleTrustFile, _ := cmd.Flags().GetString("assumption-file")
 	policyDescription, _ := cmd.Flags().GetString("policy-description")
 	maxSessionDuration, _ := cmd.Flags().GetInt32("max-session-duration")
 
-	// we need to validate that the policy file exists and has valid content so invoke a function to
-	// do this now
-	policyData, err := LoadJSONFileAsString(policyFile)
+	// validate and load the policy JSON document
+	policyData, err := util.LoadJSONFileAsString(policyFile)
 	if err != nil {
 		color.Set(color.FgRed)
 		fmt.Println("The JSON file specified for the Policy could not be loaded.")
@@ -47,7 +45,8 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	assumptionData, err := LoadJSONFileAsString(policyAssumptionFile)
+	// validate and load the trust relationship JSON document
+	trustData, err := util.LoadJSONFileAsString(roleTrustFile)
 	if err != nil {
 		color.Set(color.FgRed)
 		fmt.Println("The JSON file specified for the Role Trust Relationship could not be loaded.")
@@ -60,10 +59,10 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 		policyName = roleName
 	}
 
+	var ids []string
 	var waitGroup sync.WaitGroup
 	sem := semaphore.NewWeighted(concurrentOps)
 	ctx := context.TODO()
-	var ids []string
 	startTime := time.Now()
 
 	// get list of org accounts
@@ -103,8 +102,17 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			assumedClient := iam.NewFromConfig(cfg)
 
-			inventoryPolicy := CreateIAMPolicy(assumedClient, policyName, policyData, path, policyDescription)
-			CreateIAMRole(assumedClient, roleName, path, assumptionData, roleDescription, maxSessionDuration)
+			//fmt.Printf("  Account ID %s: Creating an IAM Policy named '%s'\n", id, policyName)
+			inventoryPolicy, err := CreateIAMPolicy(assumedClient, id, policyName, policyData, path, policyDescription)
+
+			// if any error occurred during Policy creation then display it, but continue with the remainder of the functionality
+			if err != nil {
+				color.Set(color.FgHiYellow)
+				fmt.Println("An error occurred during Policy creation.")
+				fmt.Printf("The error was: %v", err)
+			}
+
+			CreateIAMRole(assumedClient, id, roleName, path, trustData, roleDescription, maxSessionDuration)
 			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, roleName)
 
 			color.Set(color.FgGreen)
@@ -115,10 +123,10 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	waitGroup.Wait()
 
-	fmt.Printf("Took %f seconds to complete creation.", time.Since(startTime).Seconds())
+	fmt.Printf("\nTook %f seconds to complete Role creation.\n", time.Since(startTime).Seconds())
 }
 
-func CreateIAMPolicy(client *iam.Client, policyName string, policyDocument string, path string, description string) *iam.CreatePolicyOutput {
+func CreateIAMPolicy(client *iam.Client, id string, policyName string, policyDocument string, path string, description string) (*iam.CreatePolicyOutput, error) {
 
 	var input *iam.CreatePolicyInput = &iam.CreatePolicyInput{
 		PolicyName:     &policyName,
@@ -126,21 +134,28 @@ func CreateIAMPolicy(client *iam.Client, policyName string, policyDocument strin
 		Description:    &description,
 		PolicyDocument: &policyDocument,
 	}
+
 	resp, err := client.CreatePolicy(context.TODO(), input)
 
+	// in the case of error
 	if err != nil {
 		var eae *types.EntityAlreadyExistsException
+
+		// handle
 		if errors.As(err, &eae) {
 
-			log.Printf("Warning: Policy '%s' already exists\n", policyName)
+			color.Set(color.FgYellow)
+			fmt.Printf(" Account ID %s: (WARN) Policy '%s' already exists\n", id, policyName)
 
 			// Get existing policy ARN
 			managedPolicies, err := client.ListPolicies(context.TODO(), &iam.ListPoliciesInput{
 				PathPrefix: &path,
 			})
 			if err != nil {
-				fmt.Printf("Could not list policies: %v\n", err)
+				//fmt.Printf("Could not list policies: %v\n", err)
+				return nil, err
 			}
+
 			var policyArn *string
 			for _, v := range managedPolicies.Policies {
 				if *v.Path == path && *v.PolicyName == policyName {
@@ -151,7 +166,8 @@ func CreateIAMPolicy(client *iam.Client, policyName string, policyDocument strin
 			// Compare policy documents
 			policy, err := client.GetPolicy(context.TODO(), &iam.GetPolicyInput{PolicyArn: policyArn})
 			if err != nil {
-				fmt.Printf("Cannot get policy %s: %v\n", *policyArn, err)
+				//fmt.Printf("Cannot get policy %s: %v\n", *policyArn, err)
+				return nil, err
 			}
 			policyVersion := policy.Policy.DefaultVersionId
 
@@ -159,22 +175,29 @@ func CreateIAMPolicy(client *iam.Client, policyName string, policyDocument strin
 				PolicyArn: policyArn,
 				VersionId: policyVersion,
 			})
+
+			// in the case of an error return it to the calling routine for handling
 			if err != nil {
-				fmt.Printf("Coult not get policy content: %v\n", err)
+				return nil, err
 			}
 
 			currentPolicy, err := url.QueryUnescape(*policyContent.PolicyVersion.Document)
+
+			// in the case of an error return it to the calling routine for handling
 			if err != nil {
-				fmt.Printf("Could not decode policy document: %v\n", err)
+				return nil, err
 			}
+
 			if currentPolicy != policyDocument {
 				_, err := client.CreatePolicyVersion(context.TODO(), &iam.CreatePolicyVersionInput{
 					PolicyArn:      policyArn,
 					PolicyDocument: &policyDocument,
 					SetAsDefault:   true,
 				})
+
+				// in the case of an error return it to the calling routine for handling
 				if err != nil {
-					fmt.Printf("Could not create policy version: %v\n", err)
+					return nil, err
 				}
 
 			}
@@ -187,14 +210,22 @@ func CreateIAMPolicy(client *iam.Client, policyName string, policyDocument strin
 			}
 
 		} else {
-			fmt.Printf("err: %v\n", err)
+			// return the error
+			return nil, err
 		}
 	}
 
 	// ensure tags on the policy are replaced with those provided
-	_ = ReplacePolicyTags(client, policyName, path)
+	err = ReplacePolicyTags(client, policyName, path)
 
-	return resp
+	// if err isn't nil then display the error
+	// if err != nil {
+	// 	fmt.PrintLn("An error occurred when executing the ReplacePolicyTags function.")
+	// 	fmt.Println("The errror was: %v", err)
+	// }
+
+	// return response with no errors
+	return resp, err
 
 }
 
@@ -213,6 +244,17 @@ func DefaultTags() []types.Tag {
 	})
 
 	return tags
+}
+
+func CheckRoleExists(client *iam.Client, name string) (bool, error) {
+
+	_, err := client.GetRole(context.TODO(), &iam.GetRoleInput{RoleName: &name})
+	if err == nil {
+		return true, err
+	} else {
+		return false, err
+	}
+
 }
 
 func DetachRolePolicies(client *iam.Client, name string) {
@@ -268,19 +310,6 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 			color.Green("Done")
 		}
 
-		// // get list of all Org Accounts
-		// accounts, err := OrgAccountList(includeAccountIds)
-
-		// if err != nil {
-		// 	color.Red("Failed")
-		// 	color.Yellow("Error: %v\n", err)
-		// }
-
-		// var ids []string
-		// for _, v := range accounts {
-		// 	ids = append(ids, *v.Id)
-		// }
-
 		assumedRoles := AssumeRoleMultipleAccounts(ids)
 
 		for id, creds := range assumedRoles {
@@ -289,7 +318,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			go func(id string, creds *ststypes.Credentials) {
 
-				fmt.Printf("Deleting the Role '%s' in Account %s\n", roleName, id)
+				fmt.Printf(" Account ID %s: Deleting the Role named '%s'\n", roleName, id)
 				sem.Acquire(ctx, 1)
 				defer sem.Release(1)
 				defer waitGroup.Done()
@@ -301,9 +330,12 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 				assumedClient := iam.NewFromConfig(cfg)
 
-				DeleteIAMRole(assumedClient, roleName)
-				DeleteIAMPolicy(assumedClient, policyName, path)
-				fmt.Printf("Role deletion complete in Account %s\n", id)
+				if DeleteIAMRole(assumedClient, roleName) {
+					DeleteIAMPolicy(assumedClient, policyName, path)
+					color.Set(color.FgGreen)
+					fmt.Printf(" Account ID %s: Role deletion complete\n", id)
+					color.Unset()
+				}
 			}(id, creds)
 		}
 
@@ -343,14 +375,13 @@ func ReplacePolicyTags(client *iam.Client, name string, path string) error {
 	arn, err := GetPolicyArn(client, name, path)
 
 	if err != nil {
-		// error occurred when trying to retrieve policy arn
-		fmt.Printf("GetPolicyArn Error: %v\n", err)
+		return err
 	} else {
 		if arn != nil {
 			// get the policy and note current tags
 			policy, err := client.GetPolicy(context.TODO(), &iam.GetPolicyInput{PolicyArn: arn})
 			if err != nil {
-				fmt.Printf("Cannot get policy %s: %v\n", *arn, err)
+				return err
 			} else {
 				for _, v := range policy.Policy.Tags {
 					currentTags = append(currentTags, *v.Key)
@@ -364,7 +395,7 @@ func ReplacePolicyTags(client *iam.Client, name string, path string) error {
 					TagKeys:   currentTags,
 				})
 				if err != nil {
-					fmt.Printf("UntagPolicy Err: %v\n", err)
+					return err
 				}
 			}
 
@@ -374,14 +405,15 @@ func ReplacePolicyTags(client *iam.Client, name string, path string) error {
 				Tags:      tags,
 			})
 			if err != nil {
-				fmt.Printf("TagPolicy Err: %v\n", err)
+				return err
 			}
-		} else {
-			fmt.Printf("Empty ARN Returned: %v\n", err)
 		}
+		// else {
+		// 	fmt.Printf("Empty ARN Returned: %v\n", err)
+		// }
 	}
 
-	// just return nil for now (the best error handling)
+	// if we reach here then no error occurred so just return nil
 	return nil
 }
 
@@ -442,16 +474,31 @@ func AttachIAMPolicy(client *iam.Client, policyArn string, roleName string) {
 
 }
 
-func DeleteIAMRole(client *iam.Client, roleName string) {
+func DeleteIAMRole(client *iam.Client, roleName string) bool {
 
-	DetachRolePolicies(client, roleName)
+	roleExists, err := CheckRoleExists(client, roleName)
 
-	_, err := client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &roleName})
+	if roleExists {
+		DetachRolePolicies(client, roleName)
 
-	if err != nil {
-		fmt.Printf("Error when executing DeleteRole: %v\n", err)
+		_, err := client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &roleName})
+
+		if err != nil {
+			fmt.Printf("Error when executing DeleteRole: %v\n", err)
+			return false
+		} else {
+			return true
+		}
+	} else {
+		var nsu *types.NoSuchEntityException
+		if errors.As(err, &nsu) {
+			fmt.Println("The specified Role could not be found.")
+		} else {
+			fmt.Println("An error occurred whilst trying to identify if the Role exists in the target acccount.")
+			fmt.Printf("The error was: %v", err)
+		}
+		return false
 	}
-
 }
 
 func DeleteIAMPolicy(client *iam.Client, policyName string, path string) {
@@ -493,7 +540,7 @@ func DeleteIAMPolicy(client *iam.Client, policyName string, path string) {
 
 }
 
-func CreateIAMRole(client *iam.Client, rolename string, path string, assumeRolePolicyDocument string, description string, maxSessionDuration int32) {
+func CreateIAMRole(client *iam.Client, id string, rolename string, path string, assumeRolePolicyDocument string, description string, maxSessionDuration int32) {
 
 	var input *iam.CreateRoleInput = &iam.CreateRoleInput{
 		MaxSessionDuration:       &maxSessionDuration,
@@ -507,7 +554,9 @@ func CreateIAMRole(client *iam.Client, rolename string, path string, assumeRoleP
 	if err != nil {
 		var eae *types.EntityAlreadyExistsException
 		if errors.As(err, &eae) {
-			log.Printf("Warning: Role '%s' already exists\n", rolename)
+			color.Set(color.FgYellow)
+			fmt.Printf(" Account ID %s: (WARN) Role '%s' already exists\n", id, rolename)
+			color.Unset()
 		} else {
 			fmt.Printf("err: %v\n", err)
 		}
