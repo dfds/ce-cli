@@ -59,11 +59,13 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 		policyName = roleName
 	}
 
-	var ids []string
+	//var targetAccounts []orgtypes.Account
 	var waitGroup sync.WaitGroup
 	sem := semaphore.NewWeighted(concurrentOps)
 	ctx := context.TODO()
 	startTime := time.Now()
+
+	targetAccounts := make(map[string]string)
 
 	// get list of org accounts
 	color.Set(color.FgWhite)
@@ -75,13 +77,13 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	} else {
 		for _, v := range accounts {
-			ids = append(ids, *v.Id)
+			targetAccounts[*v.Id] = *v.Name
 		}
 		color.Green("Done")
 	}
 
 	// assume roles in org accounts
-	assumedRoles := AssumeRoleMultipleAccounts(ids)
+	assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
 
 	for id, creds := range assumedRoles {
 
@@ -90,7 +92,7 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 		go func(id string, creds *ststypes.Credentials) {
 
 			color.Set(color.FgWhite)
-			fmt.Printf(" Account ID %s: Creating the Role named '%s'\n", id, roleName)
+			fmt.Printf(" Account %s (%s): Creating the Role named '%s'\n", targetAccounts[id], id, roleName)
 			sem.Acquire(ctx, 1)
 			defer sem.Release(1)
 			defer waitGroup.Done()
@@ -116,7 +118,7 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, roleName)
 
 			color.Set(color.FgGreen)
-			fmt.Printf(" Account ID %s: Role creation complete\n", id)
+			fmt.Printf(" Account %s (%s): Role creation complete\n", targetAccounts[id], id)
 			color.Unset()
 		}(id, creds)
 	}
@@ -147,7 +149,7 @@ func CreateIAMPolicy(client *iam.Client, id string, policyName string, policyDoc
 		if errors.As(err, &eae) {
 
 			color.Set(color.FgYellow)
-			fmt.Printf(" Account ID %s: (WARN) Policy '%s' already exists\n", id, policyName)
+			fmt.Printf(" Account %s: (WARN) Policy '%s' already exists\n", id, policyName)
 
 			// Get existing policy ARN
 			managedPolicies, err := client.ListPolicies(context.TODO(), &iam.ListPoliciesInput{
@@ -298,8 +300,9 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 		var waitGroup sync.WaitGroup
 		sem := semaphore.NewWeighted(concurrentOps)
 		ctx := context.TODO()
-		var ids []string
 		startTime := time.Now()
+
+		targetAccounts := make(map[string]string)
 
 		// get list of org accounts
 		color.Set(color.FgWhite)
@@ -311,12 +314,15 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		} else {
 			for _, v := range accounts {
-				ids = append(ids, *v.Id)
+				fmt.Println(*v.Name)
+				//targetAccounts = append(targetAccounts, v)
+				targetAccounts[*v.Id] = *v.Name
 			}
 			color.Green("Done")
 		}
 
-		assumedRoles := AssumeRoleMultipleAccounts(ids)
+		// assume roles in org accounts
+		assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
 
 		for id, creds := range assumedRoles {
 
@@ -324,7 +330,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			go func(id string, creds *ststypes.Credentials) {
 
-				fmt.Printf(" Account ID %s: Deleting the Role named '%s'\n", id, roleName)
+				fmt.Printf(" Account %s (%s): Deleting the Role named '%s'\n", id, roleName)
 				sem.Acquire(ctx, 1)
 				defer sem.Release(1)
 				defer waitGroup.Done()
@@ -342,11 +348,11 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 					DeleteIAMRole(assumedClient, roleName)
 					DeleteIAMPolicy(assumedClient, policyName, path)
 					color.Set(color.FgGreen)
-					fmt.Printf(" Account ID %s: Role deletion complete\n", id)
+					fmt.Printf(" Account %s (%s): Role deletion complete\n", id)
 					color.Unset()
 				} else {
 					color.Set(color.FgYellow)
-					fmt.Printf(" Account ID %s: (WARN) The Role named '%s' was not found.\n", id, roleName)
+					fmt.Printf(" Account %s (%s): (WARN) The Role named '%s' was not found.\n", id, roleName)
 					color.Unset()
 				}
 			}(id, creds)
@@ -564,7 +570,7 @@ func CreateIAMRole(client *iam.Client, id string, rolename string, path string, 
 		var eae *types.EntityAlreadyExistsException
 		if errors.As(err, &eae) {
 			color.Set(color.FgYellow)
-			fmt.Printf(" Account ID %s: (WARN) Role '%s' already exists\n", id, rolename)
+			fmt.Printf(" Account %s: (WARN) Role '%s' already exists\n", id, rolename)
 			color.Unset()
 		} else {
 			fmt.Printf("err: %v\n", err)

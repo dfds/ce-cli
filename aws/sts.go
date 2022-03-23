@@ -30,18 +30,18 @@ func AssumeRole(roleArn string) (*types.Credentials, error) {
 
 }
 
-func AssumeRoleMultipleAccounts(accountIds []string) map[string]*types.Credentials {
+func AssumeRoleMultipleAccounts(accounts map[string]string) map[string]*types.Credentials {
 
 	assumedRoles := make(map[string]*types.Credentials)
 
-	for _, accountId := range accountIds {
-		roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", accountId, "OrgRole")
+	for id, _ := range accounts {
+		roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", id, "OrgRole")
 		role, err := AssumeRole(roleArn)
 		if err != nil {
 			fmt.Printf("Role Assummption Error: %v\n", err)
 		}
 		if role != nil {
-			assumedRoles[accountId] = role
+			assumedRoles[id] = role
 		}
 	}
 	return assumedRoles
