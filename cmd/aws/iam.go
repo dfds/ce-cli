@@ -33,6 +33,7 @@ func IamInit() {
 	IamRoleCreateCmd.PersistentFlags().StringP("role-description", "d", "", "A description that will be attached to the created Role.")
 	IamRoleCreateCmd.PersistentFlags().StringP("policy-description", "o", "", "A description that will be attached to the created Policy.")
 	IamRoleCreateCmd.PersistentFlags().Int32P("max-session-duration", "m", 3600, "The number of minutes that an assumed role will be valid for.")
+	IamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of an S3 Bucket where the Policy and Trust documents are held.")
 
 	// define parameters input for IamRoleDeleteCmd functionality
 	IamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "Name to assign to the new role.")

@@ -35,6 +35,11 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 	roleTrustFile, _ := cmd.Flags().GetString("assumption-file")
 	policyDescription, _ := cmd.Flags().GetString("policy-description")
 	maxSessionDuration, _ := cmd.Flags().GetInt32("max-session-duration")
+	bucketName, _ := cmd.Flags().GetString("bucket-name")
+
+	fmt.Println(bucketName)
+	DownloadS3File()
+	os.Exit(1)
 
 	// validate and load the policy JSON document
 	policyData, err := util.LoadJSONFileAsString(policyFile)
