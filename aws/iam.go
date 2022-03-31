@@ -35,11 +35,124 @@ func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
 	roleTrustFile, _ := cmd.Flags().GetString("assumption-file")
 	policyDescription, _ := cmd.Flags().GetString("policy-description")
 	maxSessionDuration, _ := cmd.Flags().GetInt32("max-session-duration")
-	bucketName, _ := cmd.Flags().GetString("bucket-name")
 
+	// validate and load the policy JSON document
+	policyData, err := util.LoadJSONFileAsString(policyFile)
+	if err != nil {
+		color.Set(color.FgRed)
+		fmt.Println("The JSON file specified for the Policy could not be loaded.")
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// validate and load the trust relationship JSON document
+	trustData, err := util.LoadJSONFileAsString(roleTrustFile)
+	if err != nil {
+		color.Set(color.FgRed)
+		fmt.Println("The JSON file specified for the Role Trust Relationship could not be loaded.")
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// use roleName as the policyName too if it's not specified via parameters
+	if policyName == "" {
+		policyName = roleName
+	}
+
+	//var targetAccounts []orgtypes.Account
+	var waitGroup sync.WaitGroup
+	sem := semaphore.NewWeighted(concurrentOps)
+	ctx := context.TODO()
+	startTime := time.Now()
+
+	targetAccounts := make(map[string]string)
+
+	// get list of org accounts
+	color.Set(color.FgWhite)
+	fmt.Printf("Obtaining a list of Organizational Accounts: ")
+	accounts, err := OrgAccountList(includeAccountIds)
+	if err != nil {
+		color.Red("Failed")
+		color.Yellow("  Error: %v", err)
+		os.Exit(1)
+	} else {
+		for _, v := range accounts {
+			targetAccounts[*v.Id] = *v.Name
+		}
+		color.Green("Done")
+	}
+
+	// assume roles in org accounts
+	assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
+
+	for id, creds := range assumedRoles {
+
+		waitGroup.Add(1)
+
+		go func(id string, creds *ststypes.Credentials) {
+
+			color.Set(color.FgWhite)
+			fmt.Printf(" Account %s (%s): Creating the Role named '%s'\n", targetAccounts[id], id, roleName)
+			sem.Acquire(ctx, 1)
+			defer sem.Release(1)
+			defer waitGroup.Done()
+
+			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+			if err != nil {
+				log.Fatalf("unable to load SDK config, %v", err)
+			}
+
+			assumedClient := iam.NewFromConfig(cfg)
+
+			//fmt.Printf("  Account ID %s: Creating an IAM Policy named '%s'\n", id, policyName)
+			inventoryPolicy, err := CreateIAMPolicy(assumedClient, id, policyName, policyData, path, policyDescription)
+
+			// if any error occurred during Policy creation then display it, but continue with the remainder of the functionality
+			if err != nil {
+				color.Set(color.FgHiYellow)
+				fmt.Println("An error occurred during Policy creation.")
+				fmt.Printf("The error was: %v", err)
+			}
+
+			CreateIAMRole(assumedClient, id, roleName, path, trustData, roleDescription, maxSessionDuration)
+			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, roleName)
+
+			color.Set(color.FgGreen)
+			fmt.Printf(" Account %s (%s): Role creation complete\n", targetAccounts[id], id)
+			color.Unset()
+		}(id, creds)
+	}
+
+	waitGroup.Wait()
+
+	color.Set(color.FgCyan)
+	fmt.Printf("\nTook %f seconds to complete Role creation.\n", time.Since(startTime).Seconds())
+	color.Unset()
+}
+
+func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
+
+	// get parameters from Cobra
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+
+	roleName, _ := cmd.Flags().GetString("role-name")
+	bucketName, _ := cmd.Flags().GetString("bucket-name")
+	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
+
+	// need to assume the role for S3 bucket acess
 	fmt.Println(bucketName)
-	DownloadS3File()
+	DownloadS3File(bucketName, bucketRoleArn, roleName) //, keys)
 	os.Exit(1)
+
+	path, _ := cmd.Flags().GetString("path")
+	roleDescription, _ := cmd.Flags().GetString("role-description")
+	maxSessionDuration, _ := cmd.Flags().GetInt32("max-session-duration")
+
+	policyName, _ := cmd.Flags().GetString("policy-name")
+	policyFile, _ := cmd.Flags().GetString("policy-file")
+	policyDescription, _ := cmd.Flags().GetString("policy-description")
+	roleTrustFile := ""
 
 	// validate and load the policy JSON document
 	policyData, err := util.LoadJSONFileAsString(policyFile)
@@ -287,6 +400,92 @@ func DetachRolePolicies(client *iam.Client, name string) error {
 }
 
 func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
+
+	// get parameters from Cobra
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	path, _ := cmd.Flags().GetString("path")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+	roleName, _ := cmd.Flags().GetString("role-name")
+	policyName, _ := cmd.Flags().GetString("policy-name")
+
+	if policyName == "" {
+		policyName = roleName
+	}
+
+	if roleName == "" {
+		fmt.Println("No Role Name was specified.")
+	} else {
+		var waitGroup sync.WaitGroup
+		sem := semaphore.NewWeighted(concurrentOps)
+		ctx := context.TODO()
+		startTime := time.Now()
+
+		targetAccounts := make(map[string]string)
+
+		// get list of org accounts
+		color.Set(color.FgWhite)
+		fmt.Printf("Obtaining a list of Organizational Accounts: ")
+		accounts, err := OrgAccountList(includeAccountIds)
+		if err != nil {
+			color.Red("Failed")
+			color.Yellow("  Error: %v", err)
+			os.Exit(1)
+		} else {
+			for _, v := range accounts {
+				fmt.Println(*v.Name)
+				//targetAccounts = append(targetAccounts, v)
+				targetAccounts[*v.Id] = *v.Name
+			}
+			color.Green("Done")
+		}
+
+		// assume roles in org accounts
+		assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
+
+		for id, creds := range assumedRoles {
+
+			waitGroup.Add(1)
+
+			go func(id string, creds *ststypes.Credentials) {
+
+				fmt.Printf(" Account %s (%s): Deleting the Role named '%s'\n", id, roleName)
+				sem.Acquire(ctx, 1)
+				defer sem.Release(1)
+				defer waitGroup.Done()
+
+				cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+				if err != nil {
+					log.Fatalf("unable to load SDK config, %v", err)
+				}
+
+				assumedClient := iam.NewFromConfig(cfg)
+
+				roleExists, err := CheckRoleExists(assumedClient, roleName)
+
+				if roleExists {
+					DeleteIAMRole(assumedClient, roleName)
+					DeleteIAMPolicy(assumedClient, policyName, path)
+					color.Set(color.FgGreen)
+					fmt.Printf(" Account %s (%s): Role deletion complete\n", id)
+					color.Unset()
+				} else {
+					color.Set(color.FgYellow)
+					fmt.Printf(" Account %s (%s): (WARN) The Role named '%s' was not found.\n", id, roleName)
+					color.Unset()
+				}
+			}(id, creds)
+		}
+
+		waitGroup.Wait()
+
+		color.Set(color.FgCyan)
+		fmt.Printf("\nTook %f seconds to complete deletion.\n", time.Since(startTime).Seconds())
+		color.Unset()
+	}
+}
+
+func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
+	// Todo: This needs modifying to delete a predefined IAM role
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")

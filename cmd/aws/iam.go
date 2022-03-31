@@ -14,12 +14,30 @@ var IamRoleCreateCmd = &cobra.Command{
 	},
 }
 
+var PredefinedIamRoleCreateCmd = &cobra.Command{
+	Use:   "create-predefined-iam-role",
+	Short: "Create predefined IAM role",
+	// Long:  `All software has versions. This is Hugo's`,
+	Run: func(cmd *cobra.Command, args []string) {
+		awsCore.CreatePredefinedIAMRoleCmd(cmd, args)
+	},
+}
+
 var IamRoleDeleteCmd = &cobra.Command{
 	Use:   "delete-iam-role",
 	Short: "Delete IAM role",
 	// Long:  `All software has versions. This is Hugo's`,
 	Run: func(cmd *cobra.Command, args []string) {
 		awsCore.DeleteIAMRoleCmd(cmd, args)
+	},
+}
+
+var PredefinedIamRoleDeleteCmd = &cobra.Command{
+	Use:   "delete-predefined-iam-role",
+	Short: "Delete predefined IAM role",
+	// Long:  `All software has versions. This is Hugo's`,
+	Run: func(cmd *cobra.Command, args []string) {
+		awsCore.DeletePredefinedIAMRoleCmd(cmd, args)
 	},
 }
 
@@ -33,7 +51,12 @@ func IamInit() {
 	IamRoleCreateCmd.PersistentFlags().StringP("role-description", "d", "", "A description that will be attached to the created Role.")
 	IamRoleCreateCmd.PersistentFlags().StringP("policy-description", "o", "", "A description that will be attached to the created Policy.")
 	IamRoleCreateCmd.PersistentFlags().Int32P("max-session-duration", "m", 3600, "The number of minutes that an assumed role will be valid for.")
-	IamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of an S3 Bucket where the Policy and Trust documents are held.")
+
+	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("role-name", "r", "", "The name of a unique predefined role that will be deployed into the accounts specified.")
+	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of an S3 Bucket where the Policy and Trust documents are held.")
+	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-role-arn", "", "", "The ARN of the role that will be used to access bucket contents.")
+
+	PredefinedIamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "Name to assign to the new role.")
 
 	// define parameters input for IamRoleDeleteCmd functionality
 	IamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "Name to assign to the new role.")
