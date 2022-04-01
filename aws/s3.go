@@ -57,19 +57,24 @@ func DownloadS3File(bucketName string, bucketRoleArn string, roleName string) {
 			Key:    aws.String(pfKey),
 		})
 
-		// unmarshall into the JSON struct
-		err = json.Unmarshal(buff.Bytes(), &roleProperties)
-
 		if err != nil {
-			fmt.Println("The was a problem when trying to unmarshall the JSON data.")
+			fmt.Println("An error occurred whilst trying to download the properties file from the S3 bucket.")
 			log.Fatalf("The error was: %v\n", err)
 		} else {
-			fmt.Println("numBytes: ", numBytes)
-			fmt.Printf("Description: %s\n", roleProperties.Description)
-			fmt.Printf("Session Duration: %v\n", roleProperties.SessionDuration)
-			fmt.Printf("Path: %s\n", roleProperties.Path)
-			for _, v := range roleProperties.ManagedPolicies {
-				fmt.Printf("Managed Policy: %s\n", v)
+			// unmarshall into the JSON struct
+			err = json.Unmarshal(buff.Bytes(), &roleProperties)
+
+			if err != nil {
+				fmt.Println("The was a problem when trying to unmarshall the JSON data.")
+				log.Fatalf("The error was: %v\n", err)
+			} else {
+				fmt.Println("numBytes: ", numBytes)
+				fmt.Printf("Description: %s\n", roleProperties.Description)
+				fmt.Printf("Session Duration: %v\n", roleProperties.SessionDuration)
+				fmt.Printf("Path: %s\n", roleProperties.Path)
+				for _, v := range roleProperties.ManagedPolicies {
+					fmt.Printf("Managed Policy: %s\n", v)
+				}
 			}
 		}
 	}
