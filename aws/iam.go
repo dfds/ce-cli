@@ -137,17 +137,17 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 
 	roleName, _ := cmd.Flags().GetString("role-name")
-	bucketName, _ := cmd.Flags().GetString("bucket-name")
+	bucketName, _ = cmd.Flags().GetString("bucket-name")
 	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
 
 	// need to assume the role for S3 bucket acess
 	fmt.Println(bucketName)
-	DownloadS3File(bucketName, bucketRoleArn, roleName) //, keys)
-	os.Exit(1)
+	properties, trustPolicy, inlinePolicy := DownloadRoleDocuments(bucketName, bucketRoleArn, roleName)
 
-	path, _ := cmd.Flags().GetString("path")
-	roleDescription, _ := cmd.Flags().GetString("role-description")
-	maxSessionDuration, _ := cmd.Flags().GetInt32("max-session-duration")
+	path, _ := properties.Path
+	roleDescription, _ := properties.Description
+	maxSessionDuration, _ := properties.SessionDuration
+	//properties.ManagedPolicies
 
 	policyName, _ := cmd.Flags().GetString("policy-name")
 	policyFile, _ := cmd.Flags().GetString("policy-file")
@@ -159,15 +159,6 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 	if err != nil {
 		color.Set(color.FgRed)
 		fmt.Println("The JSON file specified for the Policy could not be loaded.")
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// validate and load the trust relationship JSON document
-	trustData, err := util.LoadJSONFileAsString(roleTrustFile)
-	if err != nil {
-		color.Set(color.FgRed)
-		fmt.Println("The JSON file specified for the Role Trust Relationship could not be loaded.")
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -232,7 +223,7 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 				fmt.Printf("The error was: %v", err)
 			}
 
-			CreateIAMRole(assumedClient, id, roleName, path, trustData, roleDescription, maxSessionDuration)
+			CreateIAMRole(assumedClient, id, roleName, path, trustPolicy, roleDescription, maxSessionDuration)
 			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, roleName)
 
 			color.Set(color.FgGreen)

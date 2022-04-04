@@ -22,7 +22,33 @@ type roleProperties struct {
 
 const DEFAULT_S3_BUCKET_KEY string = "aws/iam/"
 
-func DownloadS3File(bucketName string, bucketRoleArn string, roleName string) {
+var bucketName string
+
+func DownloadIAMRoleFile(awsS3Client *s3.Client, roleName string, fileName string) []byte {
+
+	// build the path to the properties file
+	pfKey := fmt.Sprintf("%s%s/%s", DEFAULT_S3_BUCKET_KEY, roleName, fileName)
+
+	// buffer and downloader to handle loading the file into memory
+	buff := &manager.WriteAtBuffer{}
+	downloader := manager.NewDownloader(awsS3Client)
+
+	// get the file from the S3 bucket
+	_, err := downloader.Download(context.TODO(), buff, &s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(pfKey),
+	})
+
+	if err != nil {
+		fmt.Println("An error occurred whilst trying to download the properties file from the S3 bucket.")
+		log.Fatalf("The error was: %v\n", err)
+	}
+
+	return buff.Bytes()
+
+}
+
+func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName string) (roleProperties, string, string) {
 
 	var roleProperties roleProperties
 	var awsS3Client *s3.Client
@@ -44,38 +70,25 @@ func DownloadS3File(bucketName string, bucketRoleArn string, roleName string) {
 		// new s3 client
 		awsS3Client = s3.NewFromConfig(cfg)
 
-		// build the path to the properties file
-		pfKey := fmt.Sprintf("%s%s/properties.json", DEFAULT_S3_BUCKET_KEY, roleName)
+		// get byteslice of s3 document data
+		buff := DownloadIAMRoleFile(awsS3Client, roleName, "properties.json")
 
-		// buffer and downloader to handle loading the file into memory
-		buff := &manager.WriteAtBuffer{}
-		downloader := manager.NewDownloader(awsS3Client)
-
-		// get the file from the S3 bucket
-		numBytes, err := downloader.Download(context.TODO(), buff, &s3.GetObjectInput{
-			Bucket: aws.String(bucketName),
-			Key:    aws.String(pfKey),
-		})
+		// unmarshall into the JSON struct
+		err = json.Unmarshal(buff, &roleProperties)
 
 		if err != nil {
-			fmt.Println("An error occurred whilst trying to download the properties file from the S3 bucket.")
+			fmt.Println("The was a problem when trying to unmarshall the JSON data.")
 			log.Fatalf("The error was: %v\n", err)
-		} else {
-			// unmarshall into the JSON struct
-			err = json.Unmarshal(buff.Bytes(), &roleProperties)
-
-			if err != nil {
-				fmt.Println("The was a problem when trying to unmarshall the JSON data.")
-				log.Fatalf("The error was: %v\n", err)
-			} else {
-				fmt.Println("numBytes: ", numBytes)
-				fmt.Printf("Description: %s\n", roleProperties.Description)
-				fmt.Printf("Session Duration: %v\n", roleProperties.SessionDuration)
-				fmt.Printf("Path: %s\n", roleProperties.Path)
-				for _, v := range roleProperties.ManagedPolicies {
-					fmt.Printf("Managed Policy: %s\n", v)
-				}
-			}
 		}
+
+		buff = DownloadIAMRoleFile(awsS3Client, roleName, "trust.json")
+		trustPolicy := string(buff[:])
+		fmt.Println(trustPolicy)
+
+		buff = DownloadIAMRoleFile(awsS3Client, roleName, "inlinePolicy.json")
+		inlinePolicy := string(buff[:])
+		fmt.Println(inlinePolicy)
+
+		return roleProperties, trustPolicy, inlinePolicy
 	}
 }
