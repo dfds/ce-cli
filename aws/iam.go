@@ -21,6 +21,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const DEFAULT_INLINE_POLICY_NAME string = "inlinePolicy"
+
+var defaultInline string = "inlinePolicy"
+
 func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
@@ -86,8 +90,13 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			assumedClient := iam.NewFromConfig(cfg)
 
+			// create the role
 			CreateIAMRole(assumedClient, id, roleName, path, trustPolicy, roleDescription, maxSessionDuration)
 
+			// create custom inline policy
+			CreateIAMRoleInlinePolicy(assumedClient, roleName, inlinePolicy, DEFAULT_INLINE_POLICY_NAME)
+
+			// attach managed policies
 			AttachIAMPolicy(assumedClient, managedPolicies, roleName)
 
 			color.Set(color.FgGreen)
@@ -616,6 +625,28 @@ func DeleteIAMPolicy(client *iam.Client, policyName string, path string) {
 		}
 	}
 
+}
+
+func CreateIAMRoleInlinePolicy(client *iam.Client, roleName string, inlinePolicy string, policyName string) {
+	// Note that this function will replace the existing inlinePolicy with a new one if the same policyName is used.
+	// The function can therefore be used for both creating an initial policy and updating the existing policy
+
+	// define input for the policy put request
+	var input *iam.PutRolePolicyInput = &iam.PutRolePolicyInput{
+		PolicyDocument: &inlinePolicy,
+		RoleName:       &roleName,
+		PolicyName:     &policyName,
+	}
+
+	// put the inline policy in place
+	_, err := client.PutRolePolicy(context.TODO(), input)
+
+	if err != nil {
+		color.Set(color.FgYellow)
+		fmt.Println(" There was a problem whilst trying to create the inline policy.")
+		fmt.Printf(" The error was: %v\n", err)
+		color.Unset()
+	}
 }
 
 func CreateIAMRole(client *iam.Client, id string, rolename string, path string, assumeRolePolicyDocument string, description string, maxSessionDuration int32) {
