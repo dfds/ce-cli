@@ -83,15 +83,15 @@ func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName str
 			log.Fatalf("The error was: %v\n", err)
 		}
 
+		// retrieve trust policy for the role
 		buff = DownloadIAMRoleFile(awsS3Client, roleName, "trust.json")
 		trustPolicy = string(buff[:])
-		fmt.Println(trustPolicy)
 
+		// retrieve inline policy for the role
 		buff = DownloadIAMRoleFile(awsS3Client, roleName, "inlinePolicy.json")
 		inlinePolicy = string(buff[:])
-		fmt.Println(inlinePolicy)
 	}
 
+	// return properties and policy strings
 	return roleProperties, trustPolicy, inlinePolicy
-
 }
