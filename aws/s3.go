@@ -15,7 +15,7 @@ import (
 
 type roleProperties struct {
 	Description     string   `json:"description"`
-	SessionDuration int64    `json:"sessionDuration"`
+	SessionDuration int32    `json:"sessionDuration"`
 	Path            string   `json:"path"`
 	ManagedPolicies []string `json:"managedpolicies"`
 }
@@ -50,6 +50,8 @@ func DownloadIAMRoleFile(awsS3Client *s3.Client, roleName string, fileName strin
 
 func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName string) (roleProperties, string, string) {
 
+	var trustPolicy string
+	var inlinePolicy string
 	var roleProperties roleProperties
 	var awsS3Client *s3.Client
 
@@ -82,13 +84,14 @@ func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName str
 		}
 
 		buff = DownloadIAMRoleFile(awsS3Client, roleName, "trust.json")
-		trustPolicy := string(buff[:])
+		trustPolicy = string(buff[:])
 		fmt.Println(trustPolicy)
 
 		buff = DownloadIAMRoleFile(awsS3Client, roleName, "inlinePolicy.json")
-		inlinePolicy := string(buff[:])
+		inlinePolicy = string(buff[:])
 		fmt.Println(inlinePolicy)
-
-		return roleProperties, trustPolicy, inlinePolicy
 	}
+
+	return roleProperties, trustPolicy, inlinePolicy
+
 }

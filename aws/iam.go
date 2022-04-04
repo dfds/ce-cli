@@ -15,120 +15,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 	ststypes "github.com/aws/aws-sdk-go-v2/service/sts/types"
-	"github.com/dfds/ce-cli/util"
 	"github.com/fatih/color"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/spf13/cobra"
 )
-
-func CreateIAMRoleCmd(cmd *cobra.Command, args []string) {
-
-	// get parameters from Cobra
-	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
-	path, _ := cmd.Flags().GetString("path")
-	roleName, _ := cmd.Flags().GetString("role-name")
-	roleDescription, _ := cmd.Flags().GetString("role-description")
-	policyName, _ := cmd.Flags().GetString("policy-name")
-	policyFile, _ := cmd.Flags().GetString("policy-file")
-	roleTrustFile, _ := cmd.Flags().GetString("assumption-file")
-	policyDescription, _ := cmd.Flags().GetString("policy-description")
-	maxSessionDuration, _ := cmd.Flags().GetInt32("max-session-duration")
-
-	// validate and load the policy JSON document
-	policyData, err := util.LoadJSONFileAsString(policyFile)
-	if err != nil {
-		color.Set(color.FgRed)
-		fmt.Println("The JSON file specified for the Policy could not be loaded.")
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// validate and load the trust relationship JSON document
-	trustData, err := util.LoadJSONFileAsString(roleTrustFile)
-	if err != nil {
-		color.Set(color.FgRed)
-		fmt.Println("The JSON file specified for the Role Trust Relationship could not be loaded.")
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// use roleName as the policyName too if it's not specified via parameters
-	if policyName == "" {
-		policyName = roleName
-	}
-
-	//var targetAccounts []orgtypes.Account
-	var waitGroup sync.WaitGroup
-	sem := semaphore.NewWeighted(concurrentOps)
-	ctx := context.TODO()
-	startTime := time.Now()
-
-	targetAccounts := make(map[string]string)
-
-	// get list of org accounts
-	color.Set(color.FgWhite)
-	fmt.Printf("Obtaining a list of Organizational Accounts: ")
-	accounts, err := OrgAccountList(includeAccountIds)
-	if err != nil {
-		color.Red("Failed")
-		color.Yellow("  Error: %v", err)
-		os.Exit(1)
-	} else {
-		for _, v := range accounts {
-			targetAccounts[*v.Id] = *v.Name
-		}
-		color.Green("Done")
-	}
-
-	// assume roles in org accounts
-	assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
-
-	for id, creds := range assumedRoles {
-
-		waitGroup.Add(1)
-
-		go func(id string, creds *ststypes.Credentials) {
-
-			color.Set(color.FgWhite)
-			fmt.Printf(" Account %s (%s): Creating the Role named '%s'\n", targetAccounts[id], id, roleName)
-			sem.Acquire(ctx, 1)
-			defer sem.Release(1)
-			defer waitGroup.Done()
-
-			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
-			if err != nil {
-				log.Fatalf("unable to load SDK config, %v", err)
-			}
-
-			assumedClient := iam.NewFromConfig(cfg)
-
-			//fmt.Printf("  Account ID %s: Creating an IAM Policy named '%s'\n", id, policyName)
-			inventoryPolicy, err := CreateIAMPolicy(assumedClient, id, policyName, policyData, path, policyDescription)
-
-			// if any error occurred during Policy creation then display it, but continue with the remainder of the functionality
-			if err != nil {
-				color.Set(color.FgHiYellow)
-				fmt.Println("An error occurred during Policy creation.")
-				fmt.Printf("The error was: %v", err)
-			}
-
-			CreateIAMRole(assumedClient, id, roleName, path, trustData, roleDescription, maxSessionDuration)
-			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, roleName)
-
-			color.Set(color.FgGreen)
-			fmt.Printf(" Account %s (%s): Role creation complete\n", targetAccounts[id], id)
-			color.Unset()
-		}(id, creds)
-	}
-
-	waitGroup.Wait()
-
-	color.Set(color.FgCyan)
-	fmt.Printf("\nTook %f seconds to complete Role creation.\n", time.Since(startTime).Seconds())
-	color.Unset()
-}
 
 func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
@@ -144,29 +35,11 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 	fmt.Println(bucketName)
 	properties, trustPolicy, inlinePolicy := DownloadRoleDocuments(bucketName, bucketRoleArn, roleName)
 
-	path, _ := properties.Path
-	roleDescription, _ := properties.Description
-	maxSessionDuration, _ := properties.SessionDuration
-	//properties.ManagedPolicies
-
-	policyName, _ := cmd.Flags().GetString("policy-name")
-	policyFile, _ := cmd.Flags().GetString("policy-file")
-	policyDescription, _ := cmd.Flags().GetString("policy-description")
-	roleTrustFile := ""
-
-	// validate and load the policy JSON document
-	policyData, err := util.LoadJSONFileAsString(policyFile)
-	if err != nil {
-		color.Set(color.FgRed)
-		fmt.Println("The JSON file specified for the Policy could not be loaded.")
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// use roleName as the policyName too if it's not specified via parameters
-	if policyName == "" {
-		policyName = roleName
-	}
+	_ = inlinePolicy
+	path := properties.Path
+	roleDescription := properties.Description
+	maxSessionDuration := properties.SessionDuration
+	managedPolicies := properties.ManagedPolicies
 
 	//var targetAccounts []orgtypes.Account
 	var waitGroup sync.WaitGroup
@@ -213,18 +86,9 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			assumedClient := iam.NewFromConfig(cfg)
 
-			//fmt.Printf("  Account ID %s: Creating an IAM Policy named '%s'\n", id, policyName)
-			inventoryPolicy, err := CreateIAMPolicy(assumedClient, id, policyName, policyData, path, policyDescription)
-
-			// if any error occurred during Policy creation then display it, but continue with the remainder of the functionality
-			if err != nil {
-				color.Set(color.FgHiYellow)
-				fmt.Println("An error occurred during Policy creation.")
-				fmt.Printf("The error was: %v", err)
-			}
-
 			CreateIAMRole(assumedClient, id, roleName, path, trustPolicy, roleDescription, maxSessionDuration)
-			AttachIAMPolicy(assumedClient, *inventoryPolicy.Policy.Arn, roleName)
+
+			AttachIAMPolicy(assumedClient, managedPolicies, roleName)
 
 			color.Set(color.FgGreen)
 			fmt.Printf(" Account %s (%s): Role creation complete\n", targetAccounts[id], id)
@@ -672,20 +536,24 @@ func ReplaceRoleTags(client *iam.Client, name string, path string) error {
 	return nil
 }
 
-func AttachIAMPolicy(client *iam.Client, policyArn string, roleName string) {
+func AttachIAMPolicy(client *iam.Client, policyArn []string, roleName string) {
 
-	var input *iam.AttachRolePolicyInput = &iam.AttachRolePolicyInput{
-		PolicyArn: &policyArn,
-		RoleName:  &roleName,
-	}
-	_, err := client.AttachRolePolicy(context.TODO(), input)
-	if err != nil {
-		// var eae *types.EntityAlreadyExistsException
-		// if errors.As(err, &eae) {
-		// 	log.Printf("Warning: Role '%s' already exists\n", roleName)
-		// } else {
-		fmt.Printf("err: %v\n", err)
-		// }
+	for _, v := range policyArn {
+
+		var input *iam.AttachRolePolicyInput = &iam.AttachRolePolicyInput{
+			PolicyArn: &v,
+			RoleName:  &roleName,
+		}
+
+		_, err := client.AttachRolePolicy(context.TODO(), input)
+		if err != nil {
+			// var eae *types.EntityAlreadyExistsException
+			// if errors.As(err, &eae) {
+			// 	log.Printf("Warning: Role '%s' already exists\n", roleName)
+			// } else {
+			fmt.Printf("err: %v\n", err)
+			// }
+		}
 	}
 
 }
