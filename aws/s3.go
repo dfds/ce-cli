@@ -3,14 +3,18 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/fatih/color"
 )
 
 type roleProperties struct {
@@ -39,11 +43,36 @@ func DownloadIAMRoleFile(awsS3Client *s3.Client, roleName string, fileName strin
 		Key:    aws.String(pfKey),
 	})
 
+	// in the case of an error
 	if err != nil {
+		var ensk *s3types.NoSuchKey
+		var ensb *s3types.NoSuchBucket
+
+		// display suitable error depending on the nature of the issue
+		if errors.As(err, &ensk) {
+			color.Set(color.FgYellow)
+			fmt.Printf("Configuration for a role named %s could not be retrieved.  Please verify that the provided role name is correct.\n", roleName)
+			color.Set(color.FgWhite)
+			os.Exit(1)
+		}
+
+		// this doesn't seem to work for some odd reason
+		if errors.As(err, &ensb) {
+			color.Set(color.FgYellow)
+			fmt.Printf("Configuration for the role could not be retrieved.  Please ensure that you have provided the correct Bucket Name.\n")
+			color.Set(color.FgWhite)
+			os.Exit(1)
+		}
+
+		// default behaviour for errors we don't specifically handle
+		color.Set(color.FgYellow)
 		fmt.Println("An error occurred whilst trying to download the properties file from the S3 bucket.")
-		log.Fatalf("The error was: %v\n", err)
+		fmt.Printf("The error was: %v\n", err)
+		color.Set(color.FgWhite)
+		os.Exit(1)
 	}
 
+	// return the downloaded data
 	return buff.Bytes()
 
 }
@@ -60,8 +89,11 @@ func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName str
 
 	// if role assumption fails then...
 	if err != nil {
-		fmt.Println("There was a problem while trying to assume the role required to access the CE CLI S3 bucket.")
-		log.Fatalf("The error was: %v\n", err)
+		color.Set(color.FgYellow)
+		fmt.Println("There was a problem while trying to assume the role required to access the CE CLI S3 bucket.  Please ensure that the Role ARN provided with the --bucket-role-arn parameter is set correctly.")
+		fmt.Printf("The error was: %v\n", err)
+		color.Set(color.FgWhite)
+		os.Exit(1)
 	} else {
 		// create new configuration using assumed role credentials
 		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))

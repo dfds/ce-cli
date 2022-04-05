@@ -27,6 +27,11 @@ func IamInit() {
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of an S3 Bucket where the Policy and Trust documents are held.")
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-role-arn", "", "", "The ARN of the role that will be used to access bucket contents.")
 
+	// set mandatory parameter requirements for the command
+	cobra.MarkFlagRequired(PredefinedIamRoleCreateCmd.PersistentFlags(), "role-name")
+	cobra.MarkFlagRequired(PredefinedIamRoleCreateCmd.PersistentFlags(), "bucket-name")
+	cobra.MarkFlagRequired(PredefinedIamRoleCreateCmd.PersistentFlags(), "bucket-role-arn")
+
 	PredefinedIamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "The name of the role to be deleted.")
 
 }
