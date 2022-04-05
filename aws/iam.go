@@ -23,8 +23,6 @@ import (
 
 const DEFAULT_INLINE_POLICY_NAME string = "inlinePolicy"
 
-var defaultInline string = "inlinePolicy"
-
 func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
@@ -36,7 +34,6 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
 
 	// need to assume the role for S3 bucket acess
-	fmt.Println(bucketName)
 	properties, trustPolicy, inlinePolicy := DownloadRoleDocuments(bucketName, bucketRoleArn, roleName)
 
 	_ = inlinePolicy
@@ -91,7 +88,7 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 			assumedClient := iam.NewFromConfig(cfg)
 
 			// create the role
-			CreateIAMRole(assumedClient, id, roleName, path, trustPolicy, roleDescription, maxSessionDuration)
+			CreateIAMRole(assumedClient, targetAccounts[id], id, roleName, path, trustPolicy, roleDescription, maxSessionDuration)
 
 			// create custom inline policy
 			CreateIAMRoleInlinePolicy(assumedClient, roleName, inlinePolicy, DEFAULT_INLINE_POLICY_NAME)
@@ -245,6 +242,7 @@ func CheckRoleExists(client *iam.Client, name string) (bool, error) {
 
 func DetachRolePolicies(client *iam.Client, name string) error {
 
+	// attempt to get a list of attached policies for the specified role name
 	attachedPolicies, err := client.ListAttachedRolePolicies(context.TODO(), &iam.ListAttachedRolePoliciesInput{RoleName: &name})
 
 	// if an error occurred with the last invocation then return the error
@@ -268,14 +266,9 @@ func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	path, _ := cmd.Flags().GetString("path")
+	//path, _ := cmd.Flags().GetString("path")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 	roleName, _ := cmd.Flags().GetString("role-name")
-	policyName, _ := cmd.Flags().GetString("policy-name")
-
-	if policyName == "" {
-		policyName = roleName
-	}
 
 	if roleName == "" {
 		fmt.Println("No Role Name was specified.")
@@ -297,7 +290,6 @@ func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		} else {
 			for _, v := range accounts {
-				fmt.Println(*v.Name)
 				//targetAccounts = append(targetAccounts, v)
 				targetAccounts[*v.Id] = *v.Name
 			}
@@ -313,7 +305,7 @@ func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			go func(id string, creds *ststypes.Credentials) {
 
-				fmt.Printf(" Account %s (%s): Deleting the Role named '%s'\n", id, roleName)
+				fmt.Printf(" Account %s (%s): Deleting the Role named '%s'\n", targetAccounts[id], id, roleName)
 				sem.Acquire(ctx, 1)
 				defer sem.Release(1)
 				defer waitGroup.Done()
@@ -328,14 +320,15 @@ func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 				roleExists, err := CheckRoleExists(assumedClient, roleName)
 
 				if roleExists {
+
 					DeleteIAMRole(assumedClient, roleName)
-					DeleteIAMPolicy(assumedClient, policyName, path)
+					//DeleteIAMPolicy(assumedClient, policyName, path)
 					color.Set(color.FgGreen)
-					fmt.Printf(" Account %s (%s): Role deletion complete\n", id)
+					fmt.Printf(" Account %s (%s): Role deletion complete\n", targetAccounts[id], id)
 					color.Unset()
 				} else {
 					color.Set(color.FgYellow)
-					fmt.Printf(" Account %s (%s): (WARN) The Role named '%s' was not found.\n", id, roleName)
+					fmt.Printf(" Account %s (%s): (WARN) The Role named '%s' was not found.\n", targetAccounts[id], id, roleName)
 					color.Unset()
 				}
 			}(id, creds)
@@ -482,24 +475,49 @@ func AttachIAMPolicy(client *iam.Client, policyArn []string, roleName string) {
 
 }
 
+func DeleteIAMRoleInlinePolicy(client *iam.Client, roleName string, policyName string) error {
+
+	// attempt to delete the specified inline policy from the specified role
+	_, err := client.DeleteRolePolicy(context.TODO(), &iam.DeleteRolePolicyInput{RoleName: &roleName, PolicyName: &policyName})
+	return err
+
+}
 func DeleteIAMRole(client *iam.Client, roleName string) bool {
 
-	// try to detach policies
+	// try to detach managed policies
 	err := DetachRolePolicies(client, roleName)
 
 	// if the detach of policies succeeded then...
 	if err == nil {
+
+		// attempt to delete the inline policy
+		err = DeleteIAMRoleInlinePolicy(client, roleName, DEFAULT_INLINE_POLICY_NAME)
+
+		// don't report an error if it was just due to the policy not being found, but do report other errors
+		var epnf *types.NoSuchEntityException
+		if err != nil {
+			if !errors.As(err, &epnf) {
+				color.Set(color.FgYellow)
+				fmt.Printf(" An error occurred whilst trying to delete the inline policy named %s.\n", DEFAULT_INLINE_POLICY_NAME)
+				fmt.Printf(" The error was: %v\n", err)
+				return false
+			}
+		}
+
+		// delete the role
 		_, err = client.DeleteRole(context.TODO(), &iam.DeleteRoleInput{RoleName: &roleName})
 
+		// return true or false depending on if the final deletion completed succesfully
 		if err != nil {
 			fmt.Printf("Error when executing DeleteRole: %v\n", err)
 			return false
 		} else {
 			return true
 		}
-	} else {
-		return false
 	}
+
+	// if we reach here then something went wrong so return false
+	return false
 
 }
 
@@ -564,8 +582,9 @@ func CreateIAMRoleInlinePolicy(client *iam.Client, roleName string, inlinePolicy
 	}
 }
 
-func CreateIAMRole(client *iam.Client, id string, rolename string, path string, assumeRolePolicyDocument string, description string, maxSessionDuration int32) {
+func CreateIAMRole(client *iam.Client, accountName string, accountId string, rolename string, path string, assumeRolePolicyDocument string, description string, maxSessionDuration int32) {
 
+	// define input for the role creation
 	var input *iam.CreateRoleInput = &iam.CreateRoleInput{
 		MaxSessionDuration:       &maxSessionDuration,
 		AssumeRolePolicyDocument: &assumeRolePolicyDocument,
@@ -574,14 +593,19 @@ func CreateIAMRole(client *iam.Client, id string, rolename string, path string, 
 		Description:              &description,
 	}
 
+	// try to create the required role
 	_, err := client.CreateRole(context.TODO(), input)
+
+	// in the case of an error
 	if err != nil {
 		var eae *types.EntityAlreadyExistsException
 		if errors.As(err, &eae) {
 			color.Set(color.FgYellow)
-			fmt.Printf(" Account %s: (WARN) Role '%s' already exists\n", id, rolename)
+			fmt.Printf(" Account %s (%s): (WARN) Role '%s' already exists\n", accountName, accountId, rolename)
 			color.Unset()
 		} else {
+			color.Set(color.FgYellow)
+			fmt.Printf(" Account %s (%s): (WARN) An error occurred whilst trying to create the new Role.\n", accountName, accountId)
 			fmt.Printf("err: %v\n", err)
 		}
 	}
