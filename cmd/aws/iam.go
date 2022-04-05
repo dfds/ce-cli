@@ -8,7 +8,6 @@ import (
 var PredefinedIamRoleCreateCmd = &cobra.Command{
 	Use:   "create-predefined-iam-role",
 	Short: "Create predefined IAM role",
-	// Long:  `All software has versions. This is Hugo's`,
 	Run: func(cmd *cobra.Command, args []string) {
 		awsCore.CreatePredefinedIAMRoleCmd(cmd, args)
 	},
@@ -17,7 +16,6 @@ var PredefinedIamRoleCreateCmd = &cobra.Command{
 var PredefinedIamRoleDeleteCmd = &cobra.Command{
 	Use:   "delete-predefined-iam-role",
 	Short: "Delete predefined IAM role",
-	// Long:  `All software has versions. This is Hugo's`,
 	Run: func(cmd *cobra.Command, args []string) {
 		awsCore.DeletePredefinedIAMRoleCmd(cmd, args)
 	},
@@ -29,6 +27,6 @@ func IamInit() {
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of an S3 Bucket where the Policy and Trust documents are held.")
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-role-arn", "", "", "The ARN of the role that will be used to access bucket contents.")
 
-	PredefinedIamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "Name to assign to the new role.")
+	PredefinedIamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "The name of the role to be deleted.")
 
 }
