@@ -322,7 +322,6 @@ func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 				if roleExists {
 
 					DeleteIAMRole(assumedClient, roleName)
-					//DeleteIAMPolicy(assumedClient, policyName, path)
 					color.Set(color.FgGreen)
 					fmt.Printf(" Account %s (%s): Role deletion complete\n", targetAccounts[id], id)
 					color.Unset()
