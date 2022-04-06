@@ -31,7 +31,7 @@ var bucketName string
 func DownloadIAMRoleFile(awsS3Client *s3.Client, roleName string, fileName string) []byte {
 
 	// build the path to the properties file
-	pfKey := fmt.Sprintf("%s%s/%s", DEFAULT_S3_BUCKET_KEY, roleName, fileName)
+	pfKey := fmt.Sprintf("%s%s-role/%s", DEFAULT_S3_BUCKET_KEY, roleName, fileName)
 
 	// buffer and downloader to handle loading the file into memory
 	buff := &manager.WriteAtBuffer{}
