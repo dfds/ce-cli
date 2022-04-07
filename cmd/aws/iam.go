@@ -5,6 +5,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var IamOIDCProviderUpdateThumbnailCmd = &cobra.Command{
+	Use:   "update-oidc-provider-thumbnail",
+	Short: "Updates the thumbnail associated with an IAM Open ID Connect Provider",
+	Run: func(cmd *cobra.Command, args []string) {
+		awsCore.UpdateIAMOIDCProviderThumbnailCmd(cmd, args)
+	},
+}
+
 var IamOIDCProviderCreateCmd = &cobra.Command{
 	Use:   "create-oidc-provider",
 	Short: "Create an IAM Open ID Connect Provider",
@@ -54,5 +62,8 @@ func IamInit() {
 
 	IamOIDCProviderDeleteCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
 	cobra.MarkFlagRequired(IamOIDCProviderDeleteCmd.PersistentFlags(), "url")
+
+	IamOIDCProviderUpdateThumbnailCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
+	cobra.MarkFlagRequired(IamOIDCProviderUpdateThumbnailCmd.PersistentFlags(), "url")
 
 }
