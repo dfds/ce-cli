@@ -271,6 +271,8 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 	if roleName == "" {
 		fmt.Println("No Role Name was specified.")
 	} else {
+
+		// goroutine management
 		var waitGroup sync.WaitGroup
 		sem := semaphore.NewWeighted(concurrentOps)
 		ctx := context.TODO()
@@ -314,7 +316,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 				assumedClient := iam.NewFromConfig(cfg)
 
-				roleExists, err := CheckRoleExists(assumedClient, roleName)
+				roleExists, _ := CheckRoleExists(assumedClient, roleName)
 
 				if roleExists {
 
