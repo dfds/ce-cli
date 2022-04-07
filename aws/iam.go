@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -195,109 +194,6 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 	color.Set(color.FgCyan)
 	fmt.Printf("\nTook %f seconds to complete Role creation.\n", time.Since(startTime).Seconds())
 	color.Unset()
-}
-
-func CreateIAMPolicy(client *iam.Client, id string, policyName string, policyDocument string, path string, description string) (*iam.CreatePolicyOutput, error) {
-
-	var input *iam.CreatePolicyInput = &iam.CreatePolicyInput{
-		PolicyName:     &policyName,
-		Path:           &path,
-		Description:    &description,
-		PolicyDocument: &policyDocument,
-	}
-
-	resp, err := client.CreatePolicy(context.TODO(), input)
-
-	// in the case of error
-	if err != nil {
-		var eae *types.EntityAlreadyExistsException
-
-		// handle
-		if errors.As(err, &eae) {
-
-			color.Set(color.FgYellow)
-			fmt.Printf(" Account %s: (WARN) Policy '%s' already exists\n", id, policyName)
-
-			// Get existing policy ARN
-			managedPolicies, err := client.ListPolicies(context.TODO(), &iam.ListPoliciesInput{
-				PathPrefix: &path,
-			})
-			if err != nil {
-				//fmt.Printf("Could not list policies: %v\n", err)
-				return nil, err
-			}
-
-			var policyArn *string
-			for _, v := range managedPolicies.Policies {
-				if *v.Path == path && *v.PolicyName == policyName {
-					policyArn = v.Arn
-				}
-			}
-
-			// Compare policy documents
-			policy, err := client.GetPolicy(context.TODO(), &iam.GetPolicyInput{PolicyArn: policyArn})
-			if err != nil {
-				//fmt.Printf("Cannot get policy %s: %v\n", *policyArn, err)
-				return nil, err
-			}
-			policyVersion := policy.Policy.DefaultVersionId
-
-			policyContent, err := client.GetPolicyVersion(context.TODO(), &iam.GetPolicyVersionInput{
-				PolicyArn: policyArn,
-				VersionId: policyVersion,
-			})
-
-			// in the case of an error return it to the calling routine for handling
-			if err != nil {
-				return nil, err
-			}
-
-			currentPolicy, err := url.QueryUnescape(*policyContent.PolicyVersion.Document)
-
-			// in the case of an error return it to the calling routine for handling
-			if err != nil {
-				return nil, err
-			}
-
-			if currentPolicy != policyDocument {
-				_, err := client.CreatePolicyVersion(context.TODO(), &iam.CreatePolicyVersionInput{
-					PolicyArn:      policyArn,
-					PolicyDocument: &policyDocument,
-					SetAsDefault:   true,
-				})
-
-				// in the case of an error return it to the calling routine for handling
-				if err != nil {
-					return nil, err
-				}
-
-			}
-
-			// Generate policy response
-			resp = &iam.CreatePolicyOutput{
-				Policy: &types.Policy{
-					Arn: policyArn,
-				},
-			}
-
-		} else {
-			// return the error
-			return nil, err
-		}
-	}
-
-	// ensure tags on the policy are replaced with those provided
-	err = ReplacePolicyTags(client, policyName, path)
-
-	// if err isn't nil then display the error
-	// if err != nil {
-	// 	fmt.PrintLn("An error occurred when executing the ReplacePolicyTags function.")
-	// 	fmt.Println("The errror was: %v", err)
-	// }
-
-	// return response with no errors
-	return resp, err
-
 }
 
 func DefaultTags() []types.Tag {
