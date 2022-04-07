@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 	ststypes "github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"github.com/dfds/ce-cli/util"
 	"github.com/fatih/color"
 	"golang.org/x/sync/semaphore"
 
@@ -22,6 +24,92 @@ import (
 )
 
 const DEFAULT_INLINE_POLICY_NAME string = "inlinePolicy"
+
+func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
+
+	// get parameters from cobra
+	url, _ := cmd.Flags().GetString("url")
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+
+	//var targetAccounts []orgtypes.Account
+	var waitGroup sync.WaitGroup
+	sem := semaphore.NewWeighted(concurrentOps)
+	ctx := context.TODO()
+	startTime := time.Now()
+
+	targetAccounts := make(map[string]string)
+
+	// get list of org accounts
+	color.Set(color.FgWhite)
+	fmt.Printf("Obtaining a list of Organizational Accounts: ")
+	accounts, err := OrgAccountList(includeAccountIds)
+	if err != nil {
+		color.Red("Failed")
+		color.Yellow("  Error: %v", err)
+		os.Exit(1)
+	} else {
+		for _, v := range accounts {
+			targetAccounts[*v.Id] = *v.Name
+		}
+		color.Green("Done")
+	}
+
+	// assume roles in org accounts
+	assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
+
+	for id, creds := range assumedRoles {
+
+		waitGroup.Add(1)
+
+		go func(id string, creds *ststypes.Credentials, url string) {
+
+			color.Set(color.FgWhite)
+			fmt.Printf(" Account %s (%s): Creating an IAM OpenID Connect Provider.\n", targetAccounts[id], id)
+			sem.Acquire(ctx, 1)
+			defer sem.Release(1)
+			defer waitGroup.Done()
+
+			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+			if err != nil {
+				log.Fatalf("unable to load SDK config, %v", err)
+			}
+
+			// get a new client used the config we just generated
+			assumedClient := iam.NewFromConfig(cfg)
+
+			// try to create the OpenID Connect Provider
+			err = CreateOpenIDConnectProvider(assumedClient, url)
+
+			if err != nil {
+				// handle the error
+				var eae *types.EntityAlreadyExistsException
+				if errors.As(err, &eae) {
+					color.Set(color.FgYellow)
+					fmt.Printf(" Account %s (%s): (WARN) The OpenID Connect Provider already exists\n", targetAccounts[id], id)
+					color.Set(color.FgWhite)
+				} else {
+					if err != nil {
+						color.Set(color.FgYellow)
+						fmt.Printf(" Account %s (%s): (ERR) An error occurred when trying to create the OpenID Connect Provider.\n", targetAccounts[id], id)
+						fmt.Printf(" Account %s (%s): (ERR) The error was: %v\n", targetAccounts[id], id, err)
+						color.Set(color.FgWhite)
+					}
+				}
+			} else {
+				color.Set(color.FgGreen)
+				fmt.Printf(" Account %s (%s): IAM OpenID Connect Provider creation complete\n", targetAccounts[id], id)
+				color.Unset()
+			}
+		}(id, creds, url)
+	}
+
+	waitGroup.Wait()
+
+	color.Set(color.FgCyan)
+	fmt.Printf("\nTook %f seconds to complete IAM OpenID Connect Provider creation.\n", time.Since(startTime).Seconds())
+	color.Unset()
+}
 
 func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
@@ -578,6 +666,42 @@ func CreateIAMRoleInlinePolicy(client *iam.Client, roleName string, inlinePolicy
 		fmt.Printf(" The error was: %v\n", err)
 		color.Unset()
 	}
+}
+
+func CreateOpenIDConnectProvider(client *iam.Client, url string) error {
+
+	// split the provided URL into component parts
+	urlParts := strings.Split(url, "/")
+
+	// get the host component
+	server := urlParts[2]
+
+	// set default ssl port
+	var port uint = 443
+
+	// get the thumb print for the provider
+	thumbPrintList := util.GetCertificateSHAThumbprint(&server, &port)
+
+	// build clientIDList with standard audient
+	clientIDList := make([]string, 1)
+	clientIDList[0] = "sts.amazonaws.com"
+
+	// get the default tags
+	tags := DefaultTags()
+
+	// build input for creation
+	var input *iam.CreateOpenIDConnectProviderInput = &iam.CreateOpenIDConnectProviderInput{
+		ThumbprintList: thumbPrintList,
+		Url:            &url,
+		ClientIDList:   clientIDList,
+		Tags:           tags,
+	}
+
+	// create provider
+	_, err := client.CreateOpenIDConnectProvider(context.TODO(), input)
+
+	// return content of err
+	return err
 }
 
 func CreateIAMRole(client *iam.Client, accountName string, accountId string, rolename string, path string, assumeRolePolicyDocument string, description string, maxSessionDuration int32) {
