@@ -601,6 +601,17 @@ func CreateIAMRole(client *iam.Client, accountName string, accountId string, rol
 			color.Set(color.FgYellow)
 			fmt.Printf(" Account %s (%s): (WARN) Role '%s' already exists\n", accountName, accountId, rolename)
 			color.Unset()
+
+			// if the role already existed then at least ensure the AssumeRolePolicyDocument is updated
+			_, err = client.UpdateAssumeRolePolicy(context.TODO(), &iam.UpdateAssumeRolePolicyInput{PolicyDocument: &assumeRolePolicyDocument, RoleName: &rolename})
+
+			// display errors if any occurred
+			if err != nil {
+				color.Set(color.FgYellow)
+				fmt.Printf(" Account %s (%s): (ERR) An error occurred when trying to update the AssumeRolePolicy for the Role.\n", accountName, accountId)
+				fmt.Printf(" Account %s (%s): (ERR) The error was: %v\n", accountName, accountId, err)
+				color.Unset()
+			}
 		} else {
 			color.Set(color.FgYellow)
 			fmt.Printf(" Account %s (%s): (WARN) An error occurred whilst trying to create the new Role.\n", accountName, accountId)
