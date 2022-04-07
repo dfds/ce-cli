@@ -13,11 +13,11 @@ var PredefinedIamRoleCreateCmd = &cobra.Command{
 	},
 }
 
-var PredefinedIamRoleDeleteCmd = &cobra.Command{
-	Use:   "delete-predefined-iam-role",
-	Short: "Delete predefined IAM role",
+var IamRoleDeleteCmd = &cobra.Command{
+	Use:   "delete-iam-role",
+	Short: "Delete an IAM role",
 	Run: func(cmd *cobra.Command, args []string) {
-		awsCore.DeletePredefinedIAMRoleCmd(cmd, args)
+		awsCore.DeleteIAMRoleCmd(cmd, args)
 	},
 }
 
@@ -32,6 +32,6 @@ func IamInit() {
 	cobra.MarkFlagRequired(PredefinedIamRoleCreateCmd.PersistentFlags(), "bucket-name")
 	cobra.MarkFlagRequired(PredefinedIamRoleCreateCmd.PersistentFlags(), "bucket-role-arn")
 
-	PredefinedIamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "The name of the role to be deleted.")
+	IamRoleDeleteCmd.PersistentFlags().StringP("role-name", "r", "", "The name of the role to be deleted.")
 
 }

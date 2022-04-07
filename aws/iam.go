@@ -261,12 +261,10 @@ func DetachRolePolicies(client *iam.Client, name string) error {
 	return err
 }
 
-func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
-	// Todo: This needs modifying to delete a predefined IAM role
+func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	//path, _ := cmd.Flags().GetString("path")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 	roleName, _ := cmd.Flags().GetString("role-name")
 
@@ -290,7 +288,6 @@ func DeletePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		} else {
 			for _, v := range accounts {
-				//targetAccounts = append(targetAccounts, v)
 				targetAccounts[*v.Id] = *v.Name
 			}
 			color.Green("Done")

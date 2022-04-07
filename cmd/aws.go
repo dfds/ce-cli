@@ -24,5 +24,5 @@ func awsInit() {
 	// IAM
 	aws.IamInit()
 	awsCmd.AddCommand(aws.PredefinedIamRoleCreateCmd)
-	awsCmd.AddCommand(aws.PredefinedIamRoleDeleteCmd)
+	awsCmd.AddCommand(aws.IamRoleDeleteCmd)
 }
