@@ -182,7 +182,7 @@ func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 				}
 			} else {
 				color.Set(color.FgGreen)
-				fmt.Printf(" Account %s (%s): IAM OpenID Connect Provider deletion complete\n", targetAccounts[id], id)
+				fmt.Printf(" Account %s (%s): IAM OpenID Connect Provider deletion completed.\n", targetAccounts[id], id)
 				color.Unset()
 			}
 		}(id, creds, url)
@@ -256,7 +256,7 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 				var eae *types.EntityAlreadyExistsException
 				if errors.As(err, &eae) {
 					color.Set(color.FgYellow)
-					fmt.Printf(" Account %s (%s): (WARN) The OpenID Connect Provider already exists\n", targetAccounts[id], id)
+					fmt.Printf(" Account %s (%s): (WARN) The OpenID Connect Provider already exists.\n", targetAccounts[id], id)
 					color.Set(color.FgWhite)
 				} else {
 					if err != nil {
@@ -268,7 +268,7 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 				}
 			} else {
 				color.Set(color.FgGreen)
-				fmt.Printf(" Account %s (%s): IAM OpenID Connect Provider creation complete\n", targetAccounts[id], id)
+				fmt.Printf(" Account %s (%s): IAM OpenID Connect Provider creation completed.\n", targetAccounts[id], id)
 				color.Unset()
 			}
 		}(id, creds, url)
@@ -333,7 +333,7 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 		go func(id string, creds *ststypes.Credentials) {
 
 			color.Set(color.FgWhite)
-			fmt.Printf(" Account %s (%s): Creating the Role named '%s'\n", targetAccounts[id], id, roleName)
+			fmt.Printf(" Account %s (%s): Creating the Role named '%s'.\n", targetAccounts[id], id, roleName)
 			sem.Acquire(ctx, 1)
 			defer sem.Release(1)
 			defer waitGroup.Done()
@@ -355,7 +355,7 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 			AttachIAMPolicy(assumedClient, managedPolicies, roleName)
 
 			color.Set(color.FgGreen)
-			fmt.Printf(" Account %s (%s): Role creation complete\n", targetAccounts[id], id)
+			fmt.Printf(" Account %s (%s): Role creation completed.\n", targetAccounts[id], id)
 			color.Unset()
 		}(id, creds)
 	}
@@ -459,7 +459,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 			go func(id string, creds *ststypes.Credentials) {
 
-				fmt.Printf(" Account %s (%s): Deleting the Role named '%s'\n", targetAccounts[id], id, roleName)
+				fmt.Printf(" Account %s (%s): Deleting the Role named '%s'.\n", targetAccounts[id], id, roleName)
 				sem.Acquire(ctx, 1)
 				defer sem.Release(1)
 				defer waitGroup.Done()
@@ -477,7 +477,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 					DeleteIAMRole(assumedClient, roleName)
 					color.Set(color.FgGreen)
-					fmt.Printf(" Account %s (%s): Role deletion complete\n", targetAccounts[id], id)
+					fmt.Printf(" Account %s (%s): Role deletion completed.\n", targetAccounts[id], id)
 					color.Unset()
 				} else {
 					color.Set(color.FgYellow)
@@ -608,21 +608,20 @@ func ReplaceRoleTags(client *iam.Client, name string, path string) error {
 
 func AttachIAMPolicy(client *iam.Client, policyArn []string, roleName string) {
 
+	// loop through the slice of policyArns
 	for _, v := range policyArn {
 
+		// define input
 		var input *iam.AttachRolePolicyInput = &iam.AttachRolePolicyInput{
 			PolicyArn: &v,
 			RoleName:  &roleName,
 		}
 
+		// attempt to attach the role policy
 		_, err := client.AttachRolePolicy(context.TODO(), input)
 		if err != nil {
-			// var eae *types.EntityAlreadyExistsException
-			// if errors.As(err, &eae) {
-			// 	log.Printf("Warning: Role '%s' already exists\n", roleName)
-			// } else {
-			fmt.Printf("err: %v\n", err)
-			// }
+			fmt.Println(" An error occurred when trying to attach a Role Policy to the Role.")
+			fmt.Printf(" The error was: %v\n", err)
 		}
 	}
 
