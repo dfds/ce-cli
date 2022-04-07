@@ -24,6 +24,91 @@ import (
 
 const DEFAULT_INLINE_POLICY_NAME string = "inlinePolicy"
 
+func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
+
+	// get parameters from cobra
+	url, _ := cmd.Flags().GetString("url")
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+
+	var waitGroup sync.WaitGroup
+	sem := semaphore.NewWeighted(concurrentOps)
+	ctx := context.TODO()
+	startTime := time.Now()
+
+	targetAccounts := make(map[string]string)
+
+	// get list of org accounts
+	color.Set(color.FgWhite)
+	fmt.Printf("Obtaining a list of Organizational Accounts: ")
+	accounts, err := OrgAccountList(includeAccountIds)
+	if err != nil {
+		color.Red("Failed")
+		color.Yellow("  Error: %v", err)
+		os.Exit(1)
+	} else {
+		for _, v := range accounts {
+			targetAccounts[*v.Id] = *v.Name
+		}
+		color.Green("Done")
+	}
+
+	// assume roles in org accounts
+	assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
+
+	for id, creds := range assumedRoles {
+
+		waitGroup.Add(1)
+
+		go func(id string, creds *ststypes.Credentials, url string) {
+
+			color.Set(color.FgWhite)
+			fmt.Printf(" Account %s (%s): Deleting an IAM OpenID Connect Provider.\n", targetAccounts[id], id)
+			sem.Acquire(ctx, 1)
+			defer sem.Release(1)
+			defer waitGroup.Done()
+
+			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+			if err != nil {
+				log.Fatalf("unable to load SDK config, %v", err)
+			}
+
+			// get a new client used the config we just generated
+			assumedClient := iam.NewFromConfig(cfg)
+
+			// try to delete  the OpenID Connect Provider
+			err = DeleteOpenIDConnectProvider(assumedClient, id, url)
+
+			if err != nil {
+				// handle the error
+				var nse *types.NoSuchEntityException
+				if errors.As(err, &nse) {
+					color.Set(color.FgYellow)
+					fmt.Printf(" Account %s (%s): (WARN) The OpenID Connect Provider could not be found.\n", targetAccounts[id], id)
+					color.Set(color.FgWhite)
+				} else {
+					if err != nil {
+						color.Set(color.FgYellow)
+						fmt.Printf(" Account %s (%s): (ERR) An error occurred when trying to delete the OpenID Connect Provider.\n", targetAccounts[id], id)
+						fmt.Printf(" Account %s (%s): (ERR) The error was: %v\n", targetAccounts[id], id, err)
+						color.Set(color.FgWhite)
+					}
+				}
+			} else {
+				color.Set(color.FgGreen)
+				fmt.Printf(" Account %s (%s): IAM OpenID Connect Provider deletion complete\n", targetAccounts[id], id)
+				color.Unset()
+			}
+		}(id, creds, url)
+	}
+
+	waitGroup.Wait()
+
+	color.Set(color.FgCyan)
+	fmt.Printf("\nTook %f seconds to complete IAM OpenID Connect Provider deletion.\n", time.Since(startTime).Seconds())
+	color.Unset()
+}
+
 func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from cobra
@@ -595,6 +680,26 @@ func CreateOpenIDConnectProvider(client *iam.Client, url string) error {
 
 	// create provider
 	_, err := client.CreateOpenIDConnectProvider(context.TODO(), input)
+
+	// return content of err
+	return err
+}
+
+func DeleteOpenIDConnectProvider(client *iam.Client, accountID string, url string) error {
+
+	// strip the https header
+	trimmedUrl := strings.TrimLeft(url, "https://")
+
+	// construct the arn
+	providerArn := fmt.Sprintf("arn:aws:iam::%s:oidc-provider/%s", accountID, trimmedUrl)
+
+	// build input for creation
+	var input *iam.DeleteOpenIDConnectProviderInput = &iam.DeleteOpenIDConnectProviderInput{
+		OpenIDConnectProviderArn: &providerArn,
+	}
+
+	// delete provider
+	_, err := client.DeleteOpenIDConnectProvider(context.TODO(), input)
 
 	// return content of err
 	return err

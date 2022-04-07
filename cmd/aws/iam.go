@@ -13,6 +13,14 @@ var IamOIDCProviderCreateCmd = &cobra.Command{
 	},
 }
 
+var IamOIDCProviderDeleteCmd = &cobra.Command{
+	Use:   "delete-oidc-provider",
+	Short: "Delete an IAM Open ID Connect Provider",
+	Run: func(cmd *cobra.Command, args []string) {
+		awsCore.DeleteIAMOIDCProviderCmd(cmd, args)
+	},
+}
+
 var PredefinedIamRoleCreateCmd = &cobra.Command{
 	Use:   "create-predefined-iam-role",
 	Short: "Create predefined IAM role",
@@ -43,5 +51,8 @@ func IamInit() {
 
 	IamOIDCProviderCreateCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
 	cobra.MarkFlagRequired(IamOIDCProviderCreateCmd.PersistentFlags(), "url")
+
+	IamOIDCProviderDeleteCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
+	cobra.MarkFlagRequired(IamOIDCProviderDeleteCmd.PersistentFlags(), "url")
 
 }
