@@ -27,7 +27,7 @@ The suggested way to authenticate, is to login using `saml2aws` and assume the b
 | `create-predefined-iam-role`     | Create a pre-defined IAM role, based on policies read from the S3 bucket.                     |
 | `delete-iam-role`                | Delete the specified IAM role.                                                                |
 | `create-oidc-provider`           | Create an IAM Open ID Connect Provider using the endpoint e.g. from EKS cluster.              |
-| `update-oidc-provider-thumbnail` | Updates the thumbnail associated with an IAM Open ID Connect Provider.                        |
+| `update-oidc-provider-thumbprint` | Updates the thumbprint associated with an IAM Open ID Connect Provider.                        |
 | `delete-oidc-provider`           | Delete an IAM Open ID Connect Provider.                                                       |
 | `list-org-accounts`              | Returns all AWS accounts in the Organization, optionally filtered by `--include-account-ids`. |
 

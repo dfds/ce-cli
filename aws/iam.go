@@ -24,7 +24,7 @@ import (
 
 const DEFAULT_INLINE_POLICY_NAME string = "inlinePolicy"
 
-func UpdateIAMOIDCProviderThumbnailCmd(cmd *cobra.Command, args []string) {
+func UpdateIAMOIDCProviderThumbprintCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from cobra
 	url, _ := cmd.Flags().GetString("url")
@@ -63,7 +63,7 @@ func UpdateIAMOIDCProviderThumbnailCmd(cmd *cobra.Command, args []string) {
 		go func(id string, creds *ststypes.Credentials, url string) {
 
 			color.Set(color.FgWhite)
-			fmt.Printf(" Account %s (%s): Updating the thumbnail associated with an IAM OpenID Connect Provider.\n", targetAccounts[id], id)
+			fmt.Printf(" Account %s (%s): Updating the thumbprint associated with an IAM OpenID Connect Provider.\n", targetAccounts[id], id)
 			sem.Acquire(ctx, 1)
 			defer sem.Release(1)
 			defer waitGroup.Done()
@@ -77,7 +77,7 @@ func UpdateIAMOIDCProviderThumbnailCmd(cmd *cobra.Command, args []string) {
 			assumedClient := iam.NewFromConfig(cfg)
 
 			// try to delete  the OpenID Connect Provider
-			err = UpdateOpenIDConnectProviderThumbnail(assumedClient, id, url)
+			err = UpdateOpenIDConnectProviderThumbprint(assumedClient, id, url)
 
 			if err != nil {
 				// handle the error
@@ -89,14 +89,14 @@ func UpdateIAMOIDCProviderThumbnailCmd(cmd *cobra.Command, args []string) {
 				} else {
 					if err != nil {
 						color.Set(color.FgYellow)
-						fmt.Printf(" Account %s (%s): (ERR) An error occurred when trying to update the thumbnail associatd with the OpenID Connect Provider.\n", targetAccounts[id], id)
+						fmt.Printf(" Account %s (%s): (ERR) An error occurred when trying to update the thumbprint associatd with the OpenID Connect Provider.\n", targetAccounts[id], id)
 						fmt.Printf(" Account %s (%s): (ERR) The error was: %v\n", targetAccounts[id], id, err)
 						color.Set(color.FgWhite)
 					}
 				}
 			} else {
 				color.Set(color.FgGreen)
-				fmt.Printf(" Account %s (%s): Thumbnail update for IAM OpenID Connect Provider completed.\n", targetAccounts[id], id)
+				fmt.Printf(" Account %s (%s): Thumbprint update for IAM OpenID Connect Provider completed.\n", targetAccounts[id], id)
 				color.Unset()
 			}
 		}(id, creds, url)
@@ -105,7 +105,7 @@ func UpdateIAMOIDCProviderThumbnailCmd(cmd *cobra.Command, args []string) {
 	waitGroup.Wait()
 
 	color.Set(color.FgCyan)
-	fmt.Printf("\nTook %f seconds to complete IAM OpenID Connect Provider thumbnail updating.\n", time.Since(startTime).Seconds())
+	fmt.Printf("\nTook %f seconds to complete IAM OpenID Connect Provider thumbprint updating.\n", time.Since(startTime).Seconds())
 	color.Unset()
 
 }
@@ -201,6 +201,7 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	url, _ := cmd.Flags().GetString("url")
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+	clusterName, _ := cmd.Flags().GetString("cluster-name")
 
 	//var targetAccounts []orgtypes.Account
 	var waitGroup sync.WaitGroup
@@ -232,7 +233,7 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 
 		waitGroup.Add(1)
 
-		go func(id string, creds *ststypes.Credentials, url string) {
+		go func(id string, creds *ststypes.Credentials, url string, clusterName string) {
 
 			color.Set(color.FgWhite)
 			fmt.Printf(" Account %s (%s): Creating an IAM OpenID Connect Provider.\n", targetAccounts[id], id)
@@ -248,8 +249,15 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 			// get a new client used the config we just generated
 			assumedClient := iam.NewFromConfig(cfg)
 
+			// construct the extra tag
+			var tags []types.Tag
+			tags = append(tags, types.Tag{
+				Key:   createString("clusterName"),
+				Value: createString(clusterName),
+			})
+
 			// try to create the OpenID Connect Provider
-			err = CreateOpenIDConnectProvider(assumedClient, url)
+			err = CreateOpenIDConnectProvider(assumedClient, url, tags)
 
 			if err != nil {
 				// handle the error
@@ -258,6 +266,21 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 					color.Set(color.FgYellow)
 					fmt.Printf(" Account %s (%s): (WARN) The OpenID Connect Provider already exists.\n", targetAccounts[id], id)
 					color.Set(color.FgWhite)
+
+					// build the ARN for the OIDC provider
+					providerArn := fmt.Sprintf("arn:aws:iam::%s:oidc-provider/%s", id, strings.Replace(url, "https://", "", 1))
+
+					// issue: default tags are created in CreateOpenIDConnectProvider so we have to also create them here
+					defaultTags := DefaultTags()
+					tags = append(tags, defaultTags...)
+
+					// need to ensure tags are updated here
+					fmt.Printf(" Account %s (%s): Updating tags on IAM OpenID Connect Provider.\n", targetAccounts[id], id)
+					err = TagOpenIDConnectProvider(assumedClient, providerArn, tags)
+					if err != nil {
+						fmt.Println("An error occurred when updating OIDC Provider Tags")
+						fmt.Printf("The error was: %v\n", err)
+					}
 				} else {
 					if err != nil {
 						color.Set(color.FgYellow)
@@ -271,7 +294,7 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 				fmt.Printf(" Account %s (%s): IAM OpenID Connect Provider creation completed.\n", targetAccounts[id], id)
 				color.Unset()
 			}
-		}(id, creds, url)
+		}(id, creds, url, clusterName)
 	}
 
 	waitGroup.Wait()
@@ -734,7 +757,7 @@ func CreateIAMRoleInlinePolicy(client *iam.Client, roleName string, inlinePolicy
 	}
 }
 
-func CreateOpenIDConnectProvider(client *iam.Client, url string) error {
+func CreateOpenIDConnectProvider(client *iam.Client, url string, tags []types.Tag) error {
 
 	// split the provided URL into component parts
 	urlParts := strings.Split(url, "/")
@@ -753,7 +776,10 @@ func CreateOpenIDConnectProvider(client *iam.Client, url string) error {
 	clientIDList[0] = "sts.amazonaws.com"
 
 	// get the default tags
-	tags := DefaultTags()
+	defaultTags := DefaultTags()
+
+	// merge tags
+	tags = append(tags, defaultTags...)
 
 	// build input for creation
 	var input *iam.CreateOpenIDConnectProviderInput = &iam.CreateOpenIDConnectProviderInput{
@@ -790,7 +816,16 @@ func DeleteOpenIDConnectProvider(client *iam.Client, accountID string, url strin
 	return err
 }
 
-func UpdateOpenIDConnectProviderThumbnail(client *iam.Client, accountID string, url string) error {
+func TagOpenIDConnectProvider(client *iam.Client, providerArn string, tags []types.Tag) error {
+
+	// tag the provider
+	_, err := client.TagOpenIDConnectProvider(context.TODO(), &iam.TagOpenIDConnectProviderInput{OpenIDConnectProviderArn: &providerArn, Tags: tags})
+
+	// return content of err
+	return err
+}
+
+func UpdateOpenIDConnectProviderThumbprint(client *iam.Client, accountID string, url string) error {
 
 	// strip the https header
 	trimmedUrl := strings.TrimLeft(url, "https://")
@@ -819,7 +854,7 @@ func UpdateOpenIDConnectProviderThumbnail(client *iam.Client, accountID string, 
 		ThumbprintList:           thumbPrintList,
 	}
 
-	// update provider thumbnails
+	// update provider thumbprints
 	_, err := client.UpdateOpenIDConnectProviderThumbprint(context.TODO(), input)
 
 	// if no error occurred then..

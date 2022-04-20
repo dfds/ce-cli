@@ -5,11 +5,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var IamOIDCProviderUpdateThumbnailCmd = &cobra.Command{
-	Use:   "update-oidc-provider-thumbnail",
-	Short: "Updates the thumbnail associated with an IAM Open ID Connect Provider",
+var IamOIDCProviderUpdateThumbprintCmd = &cobra.Command{
+	Use:   "update-oidc-provider-thumbprint",
+	Short: "Updates the thumbprint associated with an IAM Open ID Connect Provider",
 	Run: func(cmd *cobra.Command, args []string) {
-		awsCore.UpdateIAMOIDCProviderThumbnailCmd(cmd, args)
+		awsCore.UpdateIAMOIDCProviderThumbprintCmd(cmd, args)
 	},
 }
 
@@ -58,12 +58,14 @@ func IamInit() {
 	cobra.MarkFlagRequired(IamRoleDeleteCmd.PersistentFlags(), "role-name")
 
 	IamOIDCProviderCreateCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
+	IamOIDCProviderCreateCmd.PersistentFlags().StringP("cluster-name", "", "", "The name of the Cluster targetted by the OpenID Connect provider.")
 	cobra.MarkFlagRequired(IamOIDCProviderCreateCmd.PersistentFlags(), "url")
+	cobra.MarkFlagRequired(IamOIDCProviderCreateCmd.PersistentFlags(), "cluster-name")
 
 	IamOIDCProviderDeleteCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
 	cobra.MarkFlagRequired(IamOIDCProviderDeleteCmd.PersistentFlags(), "url")
 
-	IamOIDCProviderUpdateThumbnailCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
-	cobra.MarkFlagRequired(IamOIDCProviderUpdateThumbnailCmd.PersistentFlags(), "url")
+	IamOIDCProviderUpdateThumbprintCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
+	cobra.MarkFlagRequired(IamOIDCProviderUpdateThumbprintCmd.PersistentFlags(), "url")
 
 }
