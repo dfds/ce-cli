@@ -29,7 +29,7 @@ func UpdateIAMOIDCProviderThumbprintCmd(cmd *cobra.Command, args []string) {
 	// get parameters from cobra
 	url, _ := cmd.Flags().GetString("url")
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	excludeAccountIds := []string{} // TOBEDEFINED
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 
 	var waitGroup sync.WaitGroup
@@ -116,7 +116,7 @@ func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	// get parameters from cobra
 	url, _ := cmd.Flags().GetString("url")
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	excludeAccountIds := []string{} // TOBEDEFINED
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 
 	var waitGroup sync.WaitGroup
@@ -202,7 +202,7 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	// get parameters from cobra
 	url, _ := cmd.Flags().GetString("url")
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	excludeAccountIds := []string{} // TOBEDEFINED
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 	clusterName, _ := cmd.Flags().GetString("cluster-name")
 
@@ -311,7 +311,7 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	excludeAccountIds := []string{} // TOBEDEFINED
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 
 	roleName, _ := cmd.Flags().GetString("role-name")
@@ -447,7 +447,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
-	excludeAccountIds := []string{} // TOBEDEFINED
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 	roleName, _ := cmd.Flags().GetString("role-name")
