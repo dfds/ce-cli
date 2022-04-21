@@ -51,7 +51,7 @@ func DownloadIAMRoleFile(awsS3Client *s3.Client, roleName string, fileName strin
 		// display suitable error depending on the nature of the issue
 		if errors.As(err, &ensk) {
 			color.Set(color.FgYellow)
-			fmt.Printf("Configuration for a role named %s could not be retrieved.  Please verify that the provided role name is correct.\n", roleName)
+			fmt.Printf("Key %s for role %s not found.\n", pfKey, roleName)
 			color.Set(color.FgWhite)
 			os.Exit(1)
 		}
@@ -59,7 +59,7 @@ func DownloadIAMRoleFile(awsS3Client *s3.Client, roleName string, fileName strin
 		// this doesn't seem to work for some odd reason
 		if errors.As(err, &ensb) {
 			color.Set(color.FgYellow)
-			fmt.Printf("Configuration for the role could not be retrieved.  Please ensure that you have provided the correct Bucket Name.\n")
+			fmt.Printf("Bucket %s not found for role %s.\n", bucketName, roleName)
 			color.Set(color.FgWhite)
 			os.Exit(1)
 		}
@@ -120,7 +120,7 @@ func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName str
 		trustPolicy = string(buff[:])
 
 		// retrieve inline policy for the role
-		buff = DownloadIAMRoleFile(awsS3Client, roleName, "inlinePolicy.json")
+		buff = DownloadIAMRoleFile(awsS3Client, roleName, "policy.json")
 		inlinePolicy = string(buff[:])
 	}
 
