@@ -118,6 +118,10 @@ func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
 	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+	bucketName, _ = cmd.Flags().GetString("bucket-name")
+	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
+
+	_ = bucketRoleArn
 
 	var waitGroup sync.WaitGroup
 	sem := semaphore.NewWeighted(concurrentOps)
@@ -205,6 +209,10 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 	clusterName, _ := cmd.Flags().GetString("cluster-name")
+	bucketName, _ = cmd.Flags().GetString("bucket-name")
+	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
+
+	_ = bucketRoleArn
 
 	//var targetAccounts []orgtypes.Account
 	var waitGroup sync.WaitGroup

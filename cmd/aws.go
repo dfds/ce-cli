@@ -20,6 +20,7 @@ func awsInit() {
 	awsCmd.PersistentFlags().Int64P("concurrent-operations", "c", 5, "Maximum number of concurrent operations.")
 
 	// Organizations
+	aws.OrgInit()
 	awsCmd.AddCommand(aws.OrgAccountListCmd)
 
 	// IAM

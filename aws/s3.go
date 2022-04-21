@@ -24,6 +24,14 @@ type roleProperties struct {
 	ManagedPolicies []string `json:"managedpolicies"`
 }
 
+type excludeAccountsStruct struct {
+	Scopes struct {
+		Common             string
+		ListAccounts       []string
+		CreateOidcProvider []string
+	} `json:"scopes"`
+}
+
 const DEFAULT_S3_BUCKET_KEY string = "aws/iam/"
 
 var bucketName string
@@ -126,4 +134,69 @@ func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName str
 
 	// return properties and policy strings
 	return roleProperties, trustPolicy, inlinePolicy
+}
+
+func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketKey string, scope string) []string {
+
+	var awsS3Client *s3.Client
+	var excludeAccounts excludeAccountsStruct
+
+	// assume role required to access the CE-CLI S3 bucket
+	creds, err := AssumeRole(bucketRoleArn)
+
+	// if role assumption fails then...
+	if err != nil {
+		color.Set(color.FgYellow)
+		fmt.Println("There was a problem while trying to assume the role required to access the CE CLI S3 bucket.  Please ensure that the Role ARN provided with the --bucket-role-arn parameter is set correctly.")
+		fmt.Printf("The error was: %v\n", err)
+		color.Set(color.FgWhite)
+		os.Exit(1)
+	} else {
+		// create new configuration using assumed role credentials
+		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+		if err != nil {
+			log.Fatalf("unable to load SDK config, %v", err)
+		}
+
+		// new s3 client
+		awsS3Client = s3.NewFromConfig(cfg)
+
+		buff := &manager.WriteAtBuffer{}
+		downloader := manager.NewDownloader(awsS3Client)
+
+		// get the file from the S3 bucket
+		_, err = downloader.Download(context.TODO(), buff, &s3.GetObjectInput{
+			Bucket: aws.String(bucketName),
+			Key:    aws.String(bucketKey),
+		})
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+		}
+
+		// unmarshall into the JSON struct
+		err = json.Unmarshal(buff.Bytes(), &excludeAccounts)
+		if err != nil {
+			fmt.Println("Error unmarshalling The was a problem when trying to unmarshall the JSON data.")
+			log.Fatalf("The error was: %v\n", err)
+		}
+
+	}
+
+	// For now, just return account IDs listed under "common".
+	// We could easily add support for merging with command-specific exclusions.
+	fmt.Println("---")
+	fmt.Println(excludeAccounts.Scopes)
+	fmt.Println("---")
+	fmt.Println(excludeAccounts.Scopes.CreateOidcProvider)
+	fmt.Println("---")
+	fmt.Println(excludeAccounts.Scopes.ListAccounts)
+	fmt.Println("---")
+
+	// How to get the scope as specified in "scope", and merge with "Common" scope?
+
+	// excludeAccountIds := excludeAccountIdMap.Common
+
+	// return excludeAccountIds
+	return []string{"123", "456"}
+
 }

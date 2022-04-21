@@ -13,3 +13,12 @@ var OrgAccountListCmd = &cobra.Command{
 		awsCore.OrgAccountListCmd(cmd, args)
 	},
 }
+
+func OrgInit() {
+
+	OrgAccountListCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of the backend S3 bucket for the CLI.")
+	OrgAccountListCmd.PersistentFlags().StringP("bucket-role-arn", "", "", "The ARN of the role that will be used to access bucket contents.")
+	cobra.MarkFlagRequired(OrgAccountListCmd.PersistentFlags(), "bucket-name")
+	cobra.MarkFlagRequired(OrgAccountListCmd.PersistentFlags(), "bucket-role-arn")
+
+}

@@ -48,7 +48,7 @@ var IamRoleDeleteCmd = &cobra.Command{
 func IamInit() {
 
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("role-name", "r", "", "The name of a unique predefined role that will be deployed into the accounts specified.")
-	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of an S3 Bucket where the Policy and Trust documents are held.")
+	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of the backend S3 bucket for the CLI.")
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-role-arn", "", "", "The ARN of the role that will be used to access bucket contents.")
 	cobra.MarkFlagRequired(PredefinedIamRoleCreateCmd.PersistentFlags(), "role-name")
 	cobra.MarkFlagRequired(PredefinedIamRoleCreateCmd.PersistentFlags(), "bucket-name")
@@ -59,11 +59,19 @@ func IamInit() {
 
 	IamOIDCProviderCreateCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
 	IamOIDCProviderCreateCmd.PersistentFlags().StringP("cluster-name", "", "", "The name of the Cluster targetted by the OpenID Connect provider.")
+	IamOIDCProviderCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of the backend S3 bucket for the CLI.")
+	IamOIDCProviderCreateCmd.PersistentFlags().StringP("bucket-role-arn", "", "", "The ARN of the role that will be used to access bucket contents.")
 	cobra.MarkFlagRequired(IamOIDCProviderCreateCmd.PersistentFlags(), "url")
 	cobra.MarkFlagRequired(IamOIDCProviderCreateCmd.PersistentFlags(), "cluster-name")
+	cobra.MarkFlagRequired(IamOIDCProviderCreateCmd.PersistentFlags(), "bucket-name")
+	cobra.MarkFlagRequired(IamOIDCProviderCreateCmd.PersistentFlags(), "bucket-role-arn")
 
 	IamOIDCProviderDeleteCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
+	IamOIDCProviderDeleteCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of the backend S3 bucket for the CLI.")
+	IamOIDCProviderDeleteCmd.PersistentFlags().StringP("bucket-role-arn", "", "", "The ARN of the role that will be used to access bucket contents.")
 	cobra.MarkFlagRequired(IamOIDCProviderDeleteCmd.PersistentFlags(), "url")
+	cobra.MarkFlagRequired(IamOIDCProviderDeleteCmd.PersistentFlags(), "bucket-name")
+	cobra.MarkFlagRequired(IamOIDCProviderDeleteCmd.PersistentFlags(), "bucket-role-arn")
 
 	IamOIDCProviderUpdateThumbprintCmd.PersistentFlags().StringP("url", "u", "", "The URL for the OpenID Connect provider.")
 	cobra.MarkFlagRequired(IamOIDCProviderUpdateThumbprintCmd.PersistentFlags(), "url")
