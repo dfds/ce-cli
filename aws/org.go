@@ -14,11 +14,17 @@ import (
 func OrgAccountListCmd(cmd *cobra.Command, args []string) {
 
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
+	bucketName, _ = cmd.Flags().GetString("bucket-name")
+	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
 
-	accountList, err := OrgAccountList(includeAccountIds)
+	// Merge always excluded account IDs from backend bucket, with those supplied as args
+	excludeAccountIdsS3 := GetExcludeAccountIdsFromS3(bucketName, bucketRoleArn, "aws/org/excludeAccountIds.json", "ListAccounts")
+	excludeAccountIds = append(excludeAccountIds, excludeAccountIdsS3...)
 
+	accountList, err := OrgAccountList(includeAccountIds, excludeAccountIds)
 	if err != nil {
-		fmt.Println("Ooops!!")
+		fmt.Printf("Errr: %s\n", err)
 	} else {
 		for _, v := range accountList {
 			fmt.Println(*v.Id)
@@ -26,7 +32,7 @@ func OrgAccountListCmd(cmd *cobra.Command, args []string) {
 	}
 }
 
-func OrgAccountList(includeAccountIds []string) ([]types.Account, error) {
+func OrgAccountList(includeAccountIds []string, excludeAccountIds []string) ([]types.Account, error) {
 
 	// try to create a default config instance
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
@@ -55,14 +61,32 @@ func OrgAccountList(includeAccountIds []string) ([]types.Account, error) {
 		accountList = append(accountList, accountPage.Accounts...)
 	}
 
-	// Filter account list
+	// Filter account list to "included account ids""
 	if len(includeAccountIds) > 0 {
-		var filteredAccountList []types.Account
+		var includedAccountList []types.Account
 		for _, v := range accountList {
 			for _, incId := range includeAccountIds {
 				if *v.Id == incId {
-					filteredAccountList = append(filteredAccountList, v)
+					includedAccountList = append(includedAccountList, v)
 				}
+			}
+		}
+		accountList = includedAccountList
+	}
+
+	// Remove any excluded account ids
+	if len(excludeAccountIds) > 0 {
+		var filteredAccountList []types.Account
+		var excluded bool
+		for _, v := range accountList {
+			excluded = false
+			for _, exclId := range excludeAccountIds {
+				if *v.Id == exclId {
+					excluded = true
+				}
+			}
+			if excluded == false {
+				filteredAccountList = append(filteredAccountList, v)
 			}
 		}
 		accountList = filteredAccountList

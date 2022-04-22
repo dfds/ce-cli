@@ -29,6 +29,7 @@ func UpdateIAMOIDCProviderThumbprintCmd(cmd *cobra.Command, args []string) {
 	// get parameters from cobra
 	url, _ := cmd.Flags().GetString("url")
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 
 	var waitGroup sync.WaitGroup
@@ -41,7 +42,7 @@ func UpdateIAMOIDCProviderThumbprintCmd(cmd *cobra.Command, args []string) {
 	// get list of org accounts
 	color.Set(color.FgWhite)
 	fmt.Printf("Obtaining a list of Organizational Accounts: ")
-	accounts, err := OrgAccountList(includeAccountIds)
+	accounts, err := OrgAccountList(includeAccountIds, excludeAccountIds)
 	if err != nil {
 		color.Red("Failed")
 		color.Yellow("  Error: %v", err)
@@ -115,7 +116,14 @@ func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	// get parameters from cobra
 	url, _ := cmd.Flags().GetString("url")
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+	bucketName, _ = cmd.Flags().GetString("bucket-name")
+	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
+
+	// Merge always excluded account IDs from backend bucket, with those supplied as args
+	excludeAccountIdsS3 := GetExcludeAccountIdsFromS3(bucketName, bucketRoleArn, "aws/iam/excludeAccountIds.json", "OidcProvider")
+	excludeAccountIds = append(excludeAccountIds, excludeAccountIdsS3...)
 
 	var waitGroup sync.WaitGroup
 	sem := semaphore.NewWeighted(concurrentOps)
@@ -127,7 +135,7 @@ func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	// get list of org accounts
 	color.Set(color.FgWhite)
 	fmt.Printf("Obtaining a list of Organizational Accounts: ")
-	accounts, err := OrgAccountList(includeAccountIds)
+	accounts, err := OrgAccountList(includeAccountIds, excludeAccountIds)
 	if err != nil {
 		color.Red("Failed")
 		color.Yellow("  Error: %v", err)
@@ -200,8 +208,15 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	// get parameters from cobra
 	url, _ := cmd.Flags().GetString("url")
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 	clusterName, _ := cmd.Flags().GetString("cluster-name")
+	bucketName, _ = cmd.Flags().GetString("bucket-name")
+	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
+
+	// Merge always excluded account IDs from backend bucket, with those supplied as args
+	excludeAccountIdsS3 := GetExcludeAccountIdsFromS3(bucketName, bucketRoleArn, "aws/iam/excludeAccountIds.json", "OidcProvider")
+	excludeAccountIds = append(excludeAccountIds, excludeAccountIdsS3...)
 
 	//var targetAccounts []orgtypes.Account
 	var waitGroup sync.WaitGroup
@@ -214,7 +229,7 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	// get list of org accounts
 	color.Set(color.FgWhite)
 	fmt.Printf("Obtaining a list of Organizational Accounts: ")
-	accounts, err := OrgAccountList(includeAccountIds)
+	accounts, err := OrgAccountList(includeAccountIds, excludeAccountIds)
 	if err != nil {
 		color.Red("Failed")
 		color.Yellow("  Error: %v", err)
@@ -308,6 +323,7 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 
 	roleName, _ := cmd.Flags().GetString("role-name")
@@ -334,7 +350,7 @@ func CreatePredefinedIAMRoleCmd(cmd *cobra.Command, args []string) {
 	// get list of org accounts
 	color.Set(color.FgWhite)
 	fmt.Printf("Obtaining a list of Organizational Accounts: ")
-	accounts, err := OrgAccountList(includeAccountIds)
+	accounts, err := OrgAccountList(includeAccountIds, excludeAccountIds)
 	if err != nil {
 		color.Red("Failed")
 		color.Yellow("  Error: %v", err)
@@ -443,6 +459,8 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from Cobra
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
+
 	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
 	roleName, _ := cmd.Flags().GetString("role-name")
 
@@ -461,7 +479,7 @@ func DeleteIAMRoleCmd(cmd *cobra.Command, args []string) {
 		// get list of org accounts
 		color.Set(color.FgWhite)
 		fmt.Printf("Obtaining a list of Organizational Accounts: ")
-		accounts, err := OrgAccountList(includeAccountIds)
+		accounts, err := OrgAccountList(includeAccountIds, excludeAccountIds)
 		if err != nil {
 			color.Red("Failed")
 			color.Yellow("  Error: %v", err)

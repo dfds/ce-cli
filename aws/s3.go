@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -16,13 +19,6 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/fatih/color"
 )
-
-type roleProperties struct {
-	Description     string   `json:"description"`
-	SessionDuration int32    `json:"sessionDuration"`
-	Path            string   `json:"path"`
-	ManagedPolicies []string `json:"managedpolicies"`
-}
 
 const DEFAULT_S3_BUCKET_KEY string = "aws/iam/"
 
@@ -126,4 +122,74 @@ func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName str
 
 	// return properties and policy strings
 	return roleProperties, trustPolicy, inlinePolicy
+}
+
+func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketKey string, scope string) []string {
+
+	var awsS3Client *s3.Client
+	var excludeAccountsStruct excludeAccountsStruct
+
+	// assume role required to access the CE-CLI S3 bucket
+	creds, err := AssumeRole(bucketRoleArn)
+
+	// if role assumption fails then...
+	if err != nil {
+		color.Set(color.FgYellow)
+		fmt.Println("There was a problem while trying to assume the role required to access the CE CLI S3 bucket.  Please ensure that the Role ARN provided with the --bucket-role-arn parameter is set correctly.")
+		fmt.Printf("The error was: %v\n", err)
+		color.Set(color.FgWhite)
+		os.Exit(1)
+	} else {
+		// create new configuration using assumed role credentials
+		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+		if err != nil {
+			log.Fatalf("unable to load SDK config, %v", err)
+		}
+
+		// new s3 client
+		awsS3Client = s3.NewFromConfig(cfg)
+
+		buff := &manager.WriteAtBuffer{}
+		downloader := manager.NewDownloader(awsS3Client)
+
+		// get the file from the S3 bucket
+		fmt.Printf("Getting excluded accounts for the \"%s\" scope, based on file s3://%s/%s\n", scope, bucketName, bucketKey)
+		_, err = downloader.Download(context.TODO(), buff, &s3.GetObjectInput{
+			Bucket: aws.String(bucketName),
+			Key:    aws.String(bucketKey),
+		})
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+		}
+
+		// unmarshall into the JSON struct
+		err = json.Unmarshal(buff.Bytes(), &excludeAccountsStruct)
+		if err != nil {
+			fmt.Println("Error unmarshalling The was a problem when trying to unmarshall the JSON data.")
+			log.Fatalf("The error was: %v\n", err)
+		}
+
+	}
+
+	// Merge common excluded accounts with scope-specific exclusions
+	excludeAccountsReflect := reflect.ValueOf(excludeAccountsStruct.Scopes)
+	excludeScopes := excludeAccountsReflect.Type()
+	var excludeAccountsAppend []string
+	var excludeAccounts []string
+
+	for i := 0; i < excludeAccountsReflect.NumField(); i++ {
+		if excludeScopes.Field(i).Name == "Common" || excludeScopes.Field(i).Name == scope {
+			excludeAccountsAppend = excludeAccountsReflect.Field(i).Interface().([]string)
+			excludeAccounts = append(excludeAccounts, excludeAccountsAppend...)
+		}
+	}
+
+	if len(excludeAccounts) > 0 {
+		sort.Strings(excludeAccounts)
+		fmt.Printf("Excluding accounts %s for the \"%s\" scope, based on file s3://%s/%s\n", strings.Join(excludeAccounts, ", "), scope, bucketName, bucketKey)
+	}
+
+	// return excludeAccountIds
+	return excludeAccounts
+
 }

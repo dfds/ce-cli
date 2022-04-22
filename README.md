@@ -6,48 +6,78 @@ For AWS, the idea more specifically is to have an easy-to-use way of deploying r
 
 With this, it's easy to provision IAM roles with lesser privileges that can then be used for various use cases, like running performing inventory of AWS accounts (more or less only `Get*`, `List*`, `Describe*` permissions).
 
-Currently, the only supported resources are AWS-related, and each command therefore will start with `ce-cli aws <command>`.
+Currently, the only supported resources are AWS-related, and each command therefore will start with `ce aws <command>`.
 
 ## Getting help
 
-Use the `--help` argument to get help for the current command scope, e.g. `ce-cli aws --help`, `ce-cli aws create-predefined-iam-role --help`.
+Use the `--help` argument to get help for the current command scope, e.g. `ce aws --help`, `ce aws create-predefined-iam-role --help`.
 
-## Features
-
-### AWS
+## AWS features
 
 All the AWS commands currently the AWS Organization, and attempts to assume the organization role in each account, thus requires admin rights to the billing account. It uses the AWS SDK's default credential search order.
 
 The suggested way to authenticate, is to login using `saml2aws` and assume the billing admin role. Then set the `AWS_PROFILE` environment variable profile used by `saml2aws` (by default `saml`).
 
-#### AWS commands
+### AWS commands
 
-| Command                          | Description                                                                                   |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `create-predefined-iam-role`     | Create a pre-defined IAM role, based on policies read from the S3 bucket.                     |
-| `delete-iam-role`                | Delete the specified IAM role.                                                                |
-| `create-oidc-provider`           | Create an IAM Open ID Connect Provider using the endpoint e.g. from EKS cluster.              |
-| `update-oidc-provider-thumbprint` | Updates the thumbprint associated with an IAM Open ID Connect Provider.                        |
-| `delete-oidc-provider`           | Delete an IAM Open ID Connect Provider.                                                       |
-| `list-org-accounts`              | Returns all AWS accounts in the Organization, optionally filtered by `--include-account-ids`. |
+| Command                           | Description                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| `create-predefined-iam-role`      | Create a pre-defined IAM role, based on policies read from the S3 bucket.                     |
+| `delete-iam-role`                 | Delete the specified IAM role.                                                                |
+| `create-oidc-provider`            | Create an IAM Open ID Connect Provider using the endpoint e.g. from EKS cluster.              |
+| `update-oidc-provider-thumbprint` | Updates the thumbprint associated with an IAM Open ID Connect Provider.                       |
+| `delete-oidc-provider`            | Delete an IAM Open ID Connect Provider.                                                       |
+| `list-org-accounts`               | Returns all AWS accounts in the Organization, optionally filtered by `--include-account-ids`. |
 
 At least the `create-predefined-iam-role` command requires a backend bucket is specified (see "Backend S3 bucket"), and a role ARN to assume in order to read from it.
 
 Example:
 
 ```bash
-ce-cli aws create-predefined-iam-role --bucket-name "${BACKEND_S3_BUCKET}" --bucket-role-arn "${BACKEND_IAM_ROLE_ARN}" --role-name "inventory"
+ce aws create-predefined-iam-role --bucket-name "${BACKEND_S3_BUCKET}" --bucket-role-arn "${BACKEND_IAM_ROLE_ARN}" --role-name "inventory"
 ```
 
 Substitute `${BACKEND_S3_BUCKET}` and `${BACKEND_IAM_ROLE_ARN}` (typically in the *security* account).
 
-#### Common AWS arguments
+### Common AWS arguments
 
 | Argument                  | Short | Description                                                                                              |
 | ------------------------- | ----- | -------------------------------------------------------------------------------------------------------- |
 | `--include-account-ids`   | `-i`  | Filter the AWS Organization account IDs.<br>If omitted, *all* accounts in the Organization are returned. |
+| `--exclude-account-ids`   | `-e`  | Specifically exclude the specified account IDs.                                                          |
 | `--path`                  | `-p`  | The path (prefix) for resource names where applicable, e.g. IAM roles.                                   |
 | `--concurrent-operations` | `-c`  | Maximum number of concurrent operations for parallel operations.                                         |
+
+### Exclude certain accounts based on scope
+
+In certain cases, it's not desireable to deploy resource of a particular type to certain accounts. In DFDS' case, OIDC providers in a few AWS account for our production Kubernetes clusters are managed by an EKS pipeline. In order to use [*IAM Roles for Service Accounts*](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/setting-up-enable-IAM.html) to assume roles in *other* AWS accounts, we need to deploy OIDC providers here as well, referencing the Kubernetes OIDC endpoint - without interfering with those managed by the pipeline (or other tools).
+
+You *could* pass those account IDs through `--exclude-account-ids`, but forgetting so, might cause the resource to be overwritten anyway. Instead, some commands look in the backend S3 bucket, for any accounts that should *always* be excluded for certain operations (aka. *scopes*).
+
+The scopes, their associated, excluded, account ids are stored in JSON format, and include a "Common" scope, that is applied for all commands using the file. Example:
+
+```json
+{
+    "Scopes": {
+        "Common": [
+            "111111111111"
+        ],
+        "OidcProvider": [
+            "222222222222",
+            "333333333333"
+        ]
+    }
+}
+```
+
+Currently the following account exclusion files and scopes exist:
+
+| File                             | Scope          | Commands                                       |
+| -------------------------------- | -------------- | ---------------------------------------------- |
+| `aws/iam/excludeAccountIds.json` | `OidcProvider` | `create-oidc-provider`, `delete-oidc-provider` |
+| `aws/org/excludeAccountIds.json` | `ListAccounts` | `list-accounts`                                |
+
+It's far from perfect and could certainly be more sophisticated. One limitation is discussed in issue #14.
 
 ## Backend S3 bucket
 
@@ -138,7 +168,3 @@ Example file for the `inventory` predefined IAM role:
     ]
 }
 ```
-
-## Roadmap
-
-- Support providing semi-static configuration, such as the backend S3 bucket name (used e.g. for policy templates) through a config file and/or environment variables
