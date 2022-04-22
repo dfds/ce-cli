@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -181,7 +183,10 @@ func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketK
 		}
 	}
 
-	log.Fatal("Print some info on excluded accounts from s3")
+	if len(excludeAccounts) > 0 {
+		sort.Strings(excludeAccounts)
+		fmt.Printf("Excluding accounts %s for the \"%s\" scope, based on file %s\n", strings.Join(excludeAccounts, ", "), scope, bucketKey)
+	}
 
 	// return excludeAccountIds
 	return excludeAccounts
