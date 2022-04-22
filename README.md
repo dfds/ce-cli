@@ -22,14 +22,14 @@ The suggested way to authenticate, is to login using `saml2aws` and assume the b
 
 #### AWS commands
 
-| Command                          | Description                                                                                   |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `create-predefined-iam-role`     | Create a pre-defined IAM role, based on policies read from the S3 bucket.                     |
-| `delete-iam-role`                | Delete the specified IAM role.                                                                |
-| `create-oidc-provider`           | Create an IAM Open ID Connect Provider using the endpoint e.g. from EKS cluster.              |
-| `update-oidc-provider-thumbprint` | Updates the thumbprint associated with an IAM Open ID Connect Provider.                        |
-| `delete-oidc-provider`           | Delete an IAM Open ID Connect Provider.                                                       |
-| `list-org-accounts`              | Returns all AWS accounts in the Organization, optionally filtered by `--include-account-ids`. |
+| Command                           | Description                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| `create-predefined-iam-role`      | Create a pre-defined IAM role, based on policies read from the S3 bucket.                     |
+| `delete-iam-role`                 | Delete the specified IAM role.                                                                |
+| `create-oidc-provider`            | Create an IAM Open ID Connect Provider using the endpoint e.g. from EKS cluster.              |
+| `update-oidc-provider-thumbprint` | Updates the thumbprint associated with an IAM Open ID Connect Provider.                       |
+| `delete-oidc-provider`            | Delete an IAM Open ID Connect Provider.                                                       |
+| `list-org-accounts`               | Returns all AWS accounts in the Organization, optionally filtered by `--include-account-ids`. |
 
 At least the `create-predefined-iam-role` command requires a backend bucket is specified (see "Backend S3 bucket"), and a role ARN to assume in order to read from it.
 
@@ -46,6 +46,7 @@ Substitute `${BACKEND_S3_BUCKET}` and `${BACKEND_IAM_ROLE_ARN}` (typically in th
 | Argument                  | Short | Description                                                                                              |
 | ------------------------- | ----- | -------------------------------------------------------------------------------------------------------- |
 | `--include-account-ids`   | `-i`  | Filter the AWS Organization account IDs.<br>If omitted, *all* accounts in the Organization are returned. |
+| `--exclude-account-ids`   | `-e`  | Specifically exclude the specified account IDs.                                                          |
 | `--path`                  | `-p`  | The path (prefix) for resource names where applicable, e.g. IAM roles.                                   |
 | `--concurrent-operations` | `-c`  | Maximum number of concurrent operations for parallel operations.                                         |
 
