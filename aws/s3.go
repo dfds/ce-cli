@@ -153,6 +153,7 @@ func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketK
 		downloader := manager.NewDownloader(awsS3Client)
 
 		// get the file from the S3 bucket
+		fmt.Printf("Getting excluded accounts for the \"%s\" scope, based on file s3://%s/%s\n", scope, bucketName, bucketKey)
 		_, err = downloader.Download(context.TODO(), buff, &s3.GetObjectInput{
 			Bucket: aws.String(bucketName),
 			Key:    aws.String(bucketKey),
@@ -185,7 +186,7 @@ func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketK
 
 	if len(excludeAccounts) > 0 {
 		sort.Strings(excludeAccounts)
-		fmt.Printf("Excluding accounts %s for the \"%s\" scope, based on file %s\n", strings.Join(excludeAccounts, ", "), scope, bucketKey)
+		fmt.Printf("Excluding accounts %s for the \"%s\" scope, based on file s3://%s/%s\n", strings.Join(excludeAccounts, ", "), scope, bucketName, bucketKey)
 	}
 
 	// return excludeAccountIds

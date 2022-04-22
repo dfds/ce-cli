@@ -14,4 +14,5 @@ type excludeAccountsStruct struct {
 type excludeAccountsScopes struct {
 	Common       []string `json:"Common"`
 	ListAccounts []string `json:"ListAccounts"`
+	OidcProvider []string `json:"OidcProvider"`
 }

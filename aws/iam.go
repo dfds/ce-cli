@@ -121,7 +121,9 @@ func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	bucketName, _ = cmd.Flags().GetString("bucket-name")
 	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
 
-	_ = bucketRoleArn
+	// Merge always excluded account IDs from backend bucket, with those supplied as args
+	excludeAccountIdsS3 := GetExcludeAccountIdsFromS3(bucketName, bucketRoleArn, "aws/iam/excludeAccountIds.json", "OidcProvider")
+	excludeAccountIds = append(excludeAccountIds, excludeAccountIdsS3...)
 
 	var waitGroup sync.WaitGroup
 	sem := semaphore.NewWeighted(concurrentOps)
@@ -212,7 +214,9 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 	bucketName, _ = cmd.Flags().GetString("bucket-name")
 	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
 
-	_ = bucketRoleArn
+	// Merge always excluded account IDs from backend bucket, with those supplied as args
+	excludeAccountIdsS3 := GetExcludeAccountIdsFromS3(bucketName, bucketRoleArn, "aws/iam/excludeAccountIds.json", "OidcProvider")
+	excludeAccountIds = append(excludeAccountIds, excludeAccountIdsS3...)
 
 	//var targetAccounts []orgtypes.Account
 	var waitGroup sync.WaitGroup
