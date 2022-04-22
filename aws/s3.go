@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -124,7 +125,7 @@ func DownloadRoleDocuments(bucketName string, bucketRoleArn string, roleName str
 func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketKey string, scope string) []string {
 
 	var awsS3Client *s3.Client
-	var excludeAccounts excludeAccountsStruct
+	var excludeAccountsStruct excludeAccountsStruct
 
 	// assume role required to access the CE-CLI S3 bucket
 	creds, err := AssumeRole(bucketRoleArn)
@@ -159,7 +160,7 @@ func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketK
 		}
 
 		// unmarshall into the JSON struct
-		err = json.Unmarshal(buff.Bytes(), &excludeAccounts)
+		err = json.Unmarshal(buff.Bytes(), &excludeAccountsStruct)
 		if err != nil {
 			fmt.Println("Error unmarshalling The was a problem when trying to unmarshall the JSON data.")
 			log.Fatalf("The error was: %v\n", err)
@@ -167,21 +168,22 @@ func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketK
 
 	}
 
-	// For now, just return account IDs listed under "common".
-	// We could easily add support for merging with command-specific exclusions.
-	fmt.Println("---")
-	fmt.Println(excludeAccounts.Scopes)
-	fmt.Println("---")
-	fmt.Println(excludeAccounts.Scopes.ListAccounts)
-	fmt.Println("---")
-	// fmt.Println(excludeAccounts.Scopes.CreateOidcProvider)
-	// fmt.Println("---")
+	// Merge common excluded accounts with scope-specific exclusions
+	excludeAccountsReflect := reflect.ValueOf(excludeAccountsStruct.Scopes)
+	excludeScopes := excludeAccountsReflect.Type()
+	var excludeAccountsAppend []string
+	var excludeAccounts []string
 
-	// How to get the scope as specified in "scope", and merge with "Common" scope?
+	for i := 0; i < excludeAccountsReflect.NumField(); i++ {
+		if excludeScopes.Field(i).Name == "Common" || excludeScopes.Field(i).Name == scope {
+			excludeAccountsAppend = excludeAccountsReflect.Field(i).Interface().([]string)
+			excludeAccounts = append(excludeAccounts, excludeAccountsAppend...)
+		}
+	}
 
-	// excludeAccountIds := excludeAccountIdMap.Common
+	log.Fatal("Print some info on excluded accounts from s3")
 
 	// return excludeAccountIds
-	return []string{"123", "456"}
+	return excludeAccounts
 
 }
