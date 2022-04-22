@@ -17,21 +17,6 @@ import (
 	"github.com/fatih/color"
 )
 
-type roleProperties struct {
-	Description     string   `json:"description"`
-	SessionDuration int32    `json:"sessionDuration"`
-	Path            string   `json:"path"`
-	ManagedPolicies []string `json:"managedpolicies"`
-}
-
-type excludeAccountsStruct struct {
-	Scopes struct {
-		Common             string
-		ListAccounts       []string
-		CreateOidcProvider []string
-	} `json:"scopes"`
-}
-
 const DEFAULT_S3_BUCKET_KEY string = "aws/iam/"
 
 var bucketName string
@@ -187,10 +172,10 @@ func GetExcludeAccountIdsFromS3(bucketName string, bucketRoleArn string, bucketK
 	fmt.Println("---")
 	fmt.Println(excludeAccounts.Scopes)
 	fmt.Println("---")
-	fmt.Println(excludeAccounts.Scopes.CreateOidcProvider)
-	fmt.Println("---")
 	fmt.Println(excludeAccounts.Scopes.ListAccounts)
 	fmt.Println("---")
+	// fmt.Println(excludeAccounts.Scopes.CreateOidcProvider)
+	// fmt.Println("---")
 
 	// How to get the scope as specified in "scope", and merge with "Common" scope?
 
