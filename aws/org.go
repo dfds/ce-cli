@@ -15,7 +15,8 @@ func OrgAccountListCmd(cmd *cobra.Command, args []string) {
 
 	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
 	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
-	bucketName, _ = cmd.Flags().GetString("bucket-name")
+
+	bucketName, _ := cmd.Flags().GetString("bucket-name")
 	bucketRoleArn, _ := cmd.Flags().GetString("bucket-role-arn")
 
 	// Merge always excluded account IDs from backend bucket, with those supplied as args
