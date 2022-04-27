@@ -48,6 +48,17 @@ Substitute `${BACKEND_S3_BUCKET}` and `${BACKEND_IAM_ROLE_ARN}` (typically in th
 | `--path`                  | `-p`  | The path (prefix) for resource names where applicable, e.g. IAM roles.                                   |
 | `--concurrent-operations` | `-c`  | Maximum number of concurrent operations for parallel operations.                                         |
 
+### Configuration File
+
+If you do not wish to have to provide the bucket-name and bucket-role-arn parameters with each command execution then you can create a configuration file.  Once the file is defined and in place you no longer need to specify the values.
+
+To do this create a file named `config.yaml` inside of a folder named `.ce-cli` in your home directory.  An example of what the file should contain is displayed below.
+
+```
+bucket-name: ${BACKEND_S3_BUCKET}
+bucket-role-arn: ${BACKEND_IAM_ROLE_ARN}
+```
+
 ### Exclude certain accounts based on scope
 
 In certain cases, it's not desireable to deploy resource of a particular type to certain accounts. In DFDS' case, OIDC providers in a few AWS account for our production Kubernetes clusters are managed by an EKS pipeline. In order to use [*IAM Roles for Service Accounts*](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/setting-up-enable-IAM.html) to assume roles in *other* AWS accounts, we need to deploy OIDC providers here as well, referencing the Kubernetes OIDC endpoint - without interfering with those managed by the pipeline (or other tools).
