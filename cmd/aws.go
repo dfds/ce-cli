@@ -30,4 +30,7 @@ func awsInit() {
 	awsCmd.AddCommand(aws.IamOIDCProviderCreateCmd)
 	awsCmd.AddCommand(aws.IamOIDCProviderDeleteCmd)
 	awsCmd.AddCommand(aws.IamOIDCProviderUpdateThumbprintCmd)
+
+	// Add the command to the collection for AWS
+	awsCmd.AddCommand(aws.TestFunction)
 }

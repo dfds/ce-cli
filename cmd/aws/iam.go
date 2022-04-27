@@ -45,7 +45,19 @@ var IamRoleDeleteCmd = &cobra.Command{
 	},
 }
 
+// Struct instance for the command
+var TestFunction = &cobra.Command{
+	Use:   "test-function",
+	Short: "A simple test function.",
+	Run: func(cmd *cobra.Command, args []string) {
+		awsCore.TestFunction(cmd, args)
+	},
+}
+
 func IamInit() {
+
+	// Flags for this command
+	TestFunction.PersistentFlags().StringP("print-message", "", "", "Message to print.")
 
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("role-name", "r", "", "The name of a unique predefined role that will be deployed into the accounts specified.")
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("bucket-name", "b", "", "The name of the backend S3 bucket for the CLI.")

@@ -928,3 +928,13 @@ func CreateIAMRole(client *iam.Client, accountName string, accountId string, rol
 	_ = ReplaceRoleTags(client, rolename, path)
 
 }
+
+// Define a new function
+func TestFunction(cmd *cobra.Command, args []string) {
+
+	// Get the parameter print-message
+	message, _ := cmd.Flags().GetString("print-message")
+
+	// Display the message
+	fmt.Println(message)
+}
