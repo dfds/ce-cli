@@ -251,12 +251,12 @@ func CreateIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 		go func(id string, creds *ststypes.Credentials, url string, clusterName string) {
 
 			color.Set(color.FgWhite)
-			fmt.Printf(" Account %s (%s): Creating an IAM OpenID Connect Provider.\n", targetAccounts[id], id)
 			sem.Acquire(ctx, 1)
+			fmt.Printf(" Account %s (%s): Creating an IAM OpenID Connect Provider.\n", targetAccounts[id], id)
 			defer sem.Release(1)
 			defer waitGroup.Done()
 
-			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"), config.WithHTTPClient(util.CreateHttpClientWithoutKeepAlive()))
 			if err != nil {
 				log.Fatalf("unable to load SDK config, %v", err)
 			}
@@ -786,8 +786,8 @@ func CreateOpenIDConnectProvider(client *iam.Client, url string, tags []types.Ta
 	// set default ssl port
 	var port uint = 443
 
-	// get the thumb print for the provider
-	thumbPrintList := util.GetCertificateSHAThumbprint(&server, &port)
+	// get the thumbprint for the provider
+	thumbPrintList := util.GetCertificateSHAThumbprint(&server, port)
 
 	// build clientIDList with standard audient
 	clientIDList := make([]string, 1)
@@ -861,7 +861,7 @@ func UpdateOpenIDConnectProviderThumbprint(client *iam.Client, accountID string,
 	var port uint = 443
 
 	// get the thumb print for the provider
-	thumbPrintList := util.GetCertificateSHAThumbprint(&server, &port)
+	thumbPrintList := util.GetCertificateSHAThumbprint(&server, port)
 
 	// get the default tags
 	tags := DefaultTags()
