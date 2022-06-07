@@ -7,14 +7,16 @@ import (
 	"fmt"
 )
 
-func GetCertificateSHAThumbprint(server *string, port *uint) []string {
+func GetCertificateSHAThumbprint(server *string, port uint) []string {
 
 	// declare slice of strings to return values
 	var returnData []string
 
 	// establish remote connection
-	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", *server, *port), &tls.Config{})
+	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", *server, port), &tls.Config{})
 	if err != nil {
+		fmt.Printf("Host: %s\n", *server)
+		fmt.Printf("Port: %d\n", port)
 		panic("failed to connect: " + err.Error())
 	}
 

@@ -3,15 +3,15 @@ package aws
 import (
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"github.com/dfds/ce-cli/util"
+	"log"
 )
 
 func AssumeRole(roleArn string) (*types.Credentials, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"), config.WithHTTPClient(util.CreateHttpClientWithoutKeepAlive()))
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
