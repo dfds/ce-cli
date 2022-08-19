@@ -30,4 +30,10 @@ func awsInit() {
 	awsCmd.AddCommand(aws.IamOIDCProviderCreateCmd)
 	awsCmd.AddCommand(aws.IamOIDCProviderDeleteCmd)
 	awsCmd.AddCommand(aws.IamOIDCProviderUpdateThumbprintCmd)
+
+	// Steampipe
+	aws.SteampipeInit()
+	awsCmd.AddCommand(aws.SteamPipeConfigGenerateCmd)
+	awsCmd.AddCommand(aws.AwsConfigGenerateCmd)
+
 }
