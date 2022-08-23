@@ -9,7 +9,7 @@ import (
 )
 
 var awsConfigTemplate = `
-[profile {{.Name}}]
+[profile steampipe_{{.Name}}]
 role_arn = arn:aws:iam::{{.Id}}:role/OrgRole
 source_profile = saml
 
