@@ -9,7 +9,6 @@ var awsCmd = &cobra.Command{
 	Use:   "aws",
 	Short: "Manage resources in AWS accounts",
 	// Long:  `All software has versions. This is Hugo's`,
-	Run: func(cmd *cobra.Command, args []string) {},
 }
 
 func awsInit() {

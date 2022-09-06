@@ -8,7 +8,6 @@ import (
 var githubCmd = &cobra.Command{
 	Use:   "github",
 	Short: "GitHub tooling",
-	Run:   func(cmd *cobra.Command, args []string) {},
 }
 
 func githubInit() {
