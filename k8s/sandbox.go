@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"fmt"
+	cp "github.com/otiai10/copy"
 	"log"
 	"os"
 	"os/exec"
@@ -44,7 +45,17 @@ func DownloadTemplateRepo(path string) error {
 }
 
 func GenerateConfig(req GenerateConfigRequest) error {
+	//var templateDir = fmt.Sprintf("%s/oxygen-account/eu-west-1/k8s-hellman/", templateDirPath)
+	var sandboxDir = fmt.Sprintf("clusters/k8s-%s", req.ClusterName)
+	//var sandboxClusterManifest = fmt.Sprintf("%s/cluster/terragrunt.hcl")
+	//var sandboxServicesManifest = fmt.Sprintf("%s/services/terragrunt.hcl")
+
 	err := DownloadTemplateRepo(templateDirPath)
+	if err != nil {
+		return err
+	}
+
+	err = cp.Copy(fmt.Sprintf("%s/oxygen-account", templateDirPath), sandboxDir)
 	if err != nil {
 		return err
 	}
