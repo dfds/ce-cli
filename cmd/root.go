@@ -41,6 +41,8 @@ func init() {
 	// viper.SetDefault("license", "apache")
 
 	awsInit()
+	githubInit()
+	rootCmd.AddCommand(githubCmd)
 	rootCmd.AddCommand(awsCmd)
 }
 
