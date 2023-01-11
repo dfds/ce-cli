@@ -26,6 +26,7 @@ func awsInit() {
 	aws.IamInit()
 	awsCmd.AddCommand(aws.PredefinedIamRoleCreateCmd)
 	awsCmd.AddCommand(aws.IamRoleDeleteCmd)
+	awsCmd.AddCommand(aws.IamRoleGetAllCmd)
 	awsCmd.AddCommand(aws.IamOIDCProviderCreateCmd)
 	awsCmd.AddCommand(aws.IamOIDCProviderDeleteCmd)
 	awsCmd.AddCommand(aws.IamOIDCProviderUpdateThumbprintCmd)

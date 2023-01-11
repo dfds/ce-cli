@@ -111,6 +111,81 @@ func UpdateIAMOIDCProviderThumbprintCmd(cmd *cobra.Command, args []string) {
 
 }
 
+func GetAllIAMRolesCmd(cmd *cobra.Command, args []string) {
+	includeAccountIds, _ := cmd.Flags().GetStringSlice("include-account-ids")
+	excludeAccountIds, _ := cmd.Flags().GetStringSlice("exclude-account-ids")
+	concurrentOps, _ := cmd.Flags().GetInt64("concurrent-operations")
+
+	var waitGroup sync.WaitGroup
+	sem := semaphore.NewWeighted(concurrentOps)
+	ctx := context.TODO()
+	startTime := time.Now()
+
+	targetAccounts := make(map[string]string)
+
+	// get list of org accounts
+	color.Set(color.FgWhite)
+	fmt.Printf("Obtaining a list of Organizational Accounts: ")
+	accounts, err := OrgAccountList(includeAccountIds, excludeAccountIds)
+	if err != nil {
+		color.Red("Failed")
+		color.Yellow("  Error: %v", err)
+		os.Exit(1)
+	} else {
+		for _, v := range accounts {
+			targetAccounts[*v.Id] = *v.Name
+		}
+		color.Green("Done")
+	}
+
+	assumedRoles := AssumeRoleMultipleAccounts(targetAccounts)
+
+	fmt.Println("id,account_alias,role_path,role_name,last_used")
+
+	for id, creds := range assumedRoles {
+		waitGroup.Add(1)
+
+		go func(id string, creds *ststypes.Credentials) {
+			sem.Acquire(ctx, 1)
+			defer sem.Release(1)
+			defer waitGroup.Done()
+			var roles []types.Role
+			cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(*creds.AccessKeyId, *creds.SecretAccessKey, *creds.SessionToken)), config.WithRegion("eu-west-1"))
+			if err != nil {
+				log.Fatalf("unable to load SDK config, %v", err)
+			}
+
+			// get a new client used the config we just generated
+			assumedClient := iam.NewFromConfig(cfg)
+			resps := iam.NewListRolesPaginator(assumedClient, &iam.ListRolesInput{})
+
+			for resps.HasMorePages() {
+				page, err := resps.NextPage(ctx)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				roles = append(roles, page.Roles...)
+			}
+
+			for _, role := range roles {
+				roleResp, err := assumedClient.GetRole(ctx, &iam.GetRoleInput{RoleName: role.RoleName})
+				if err != nil {
+					log.Fatal(err)
+				}
+				fmt.Printf("%s,%s,%s,%s,%s\n", id, targetAccounts[id], *role.Path, *role.RoleName, roleResp.Role.RoleLastUsed.LastUsedDate)
+			}
+
+		}(id, creds)
+	}
+
+	waitGroup.Wait()
+
+	color.Set(color.FgCyan)
+	fmt.Printf("\nTook %f seconds to complete.\n", time.Since(startTime).Seconds())
+	color.Unset()
+}
+
 func DeleteIAMOIDCProviderCmd(cmd *cobra.Command, args []string) {
 
 	// get parameters from cobra

@@ -45,6 +45,14 @@ var IamRoleDeleteCmd = &cobra.Command{
 	},
 }
 
+var IamRoleGetAllCmd = &cobra.Command{
+	Use:   "get-all-iam-roles",
+	Short: "Gets all IAM roles across accounts",
+	Run: func(cmd *cobra.Command, args []string) {
+		awsCore.GetAllIAMRolesCmd(cmd, args)
+	},
+}
+
 func IamInit() {
 
 	PredefinedIamRoleCreateCmd.PersistentFlags().StringP("role-name", "r", "", "The name of a unique predefined role that will be deployed into the accounts specified.")
