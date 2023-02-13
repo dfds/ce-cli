@@ -34,7 +34,7 @@ var listGithubSecretsCmd = &cobra.Command{
 }
 
 func ghSecretsInit() {
-	listGithubSecretsCmd.PersistentFlags().Bool("human-readable", false, "human readable output format. defaults to printing (valid) json if not set")
-	listGithubSecretsCmd.PersistentFlags().Bool("display-empty", false, "if set: prints repos with no secrets found to confirm they are being scraped and do indeed not contain any secrets")
+	listGithubSecretsCmd.PersistentFlags().Bool("human-readable", false, "human readable output format. defaults to printing json to stdout if not set")
+	listGithubSecretsCmd.PersistentFlags().Bool("display-empty", false, "if set: also prints repos with no secrets found")
 	rootCmd.AddCommand(listGithubSecretsCmd)
 }

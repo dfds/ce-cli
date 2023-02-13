@@ -7,33 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-github/v47/github"
-	//"github.com/google/go-github/v49/github"
-	//"github.com/spf13/cobra"
+	"github.com/google/go-github/v47/github" /*we know it works with v47*/
 )
-
-/*
-allTODO:
-- [x] use github SDK
-- [x] stop using requests
-- [x] map between repo names and IDs because we need to switch between these often
-- [] proper error handling & logging
-- [] refactor:
-	- [x] function which does the whole response for each type of secret
-	- [] dont make requests of what we don't want
-	- [x] get github utils vars
-	- [x] human readable function for each type of secret
-- [x] get context instead of reading env var
-- [x] possible to output in json
-- [] cli-like invocation (args)
-	- [] use cobra instead of flag
-		- figure out cobra
-	- [x] slectable output format (text/json/etc)
-	- [] selectable secrets type
-- [x] concurrently make requests
-look at https://github.com/dfds/ce-cli/blob/main/github/repos.go
-to see how things are  done
-*/
 
 type repoIdentifier struct { // we assume the number of repos will always be ~O(10^2)
 	byName map[string]github.Repository
@@ -68,7 +43,6 @@ func unmarshalResponseAny(b []byte, res interface{}) error {
 }
 
 func ListghSecretsCmdTest(humanReadable, displayEmpty bool) {
-	//repo2secretsmap := make(map[string][]repoSecret)
 	repo2secretsmap := syncRepoMap{m: make(map[string][]repoSecret), s: &sync.Mutex{}}
 	//setting utility variables
 	//wantverbose := false
@@ -78,7 +52,6 @@ func ListghSecretsCmdTest(humanReadable, displayEmpty bool) {
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
-	//fmt.Printf("Repos object list has length: %v and %v", len(r.byId), len(r.byName))
 
 	//Org secrets
 	m, err := getOrgSecrets()
