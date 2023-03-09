@@ -16,7 +16,7 @@ Use the `--help` argument to get help for the current command scope, e.g. `ce aw
 
 All the AWS commands currently the AWS Organization, and attempts to assume the organization role in each account, thus requires admin rights to the billing account. It uses the AWS SDK's default credential search order.
 
-The suggested way to authenticate, is to login using `saml2aws` and assume the billing admin role. Then set the `AWS_PROFILE` environment variable profile used by `saml2aws` (by default `saml`).
+The suggested way to authenticate, is to login using `go-aws-sso -p admin` and assume the admin role. Then set the `AWS_PROFILE` environment variable with `export AWS_PROFILE=admin`.
 
 ### AWS commands
 
