@@ -171,7 +171,7 @@ func GetAllIAMRolesCmd(cmd *cobra.Command, args []string) {
 			for _, role := range roles {
 				roleResp, err := assumedClient.GetRole(ctx, &iam.GetRoleInput{RoleName: role.RoleName})
 				if err != nil {
-					log.Fatal(err)
+					continue
 				}
 				fmt.Printf("%s,%s,%s,%s,%s\n", id, targetAccounts[id], *role.Path, *role.RoleName, roleResp.Role.RoleLastUsed.LastUsedDate)
 			}
