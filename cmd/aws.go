@@ -8,11 +8,9 @@ import (
 var awsCmd = &cobra.Command{
 	Use:   "aws",
 	Short: "Manage resources in AWS accounts",
-	// Long:  `All software has versions. This is Hugo's`,
 }
 
 func awsInit() {
-	// Emilcat
 	awsCmd.PersistentFlags().StringSliceP("include-account-ids", "i", []string{}, "Account IDs to target.")
 	awsCmd.PersistentFlags().StringSliceP("exclude-account-ids", "e", []string{}, "Account IDs to exclude.")
 	awsCmd.PersistentFlags().StringP("path", "t", "/managed/", "The path for the resource.")
@@ -36,4 +34,7 @@ func awsInit() {
 	awsCmd.AddCommand(aws.SteamPipeConfigGenerateCmd)
 	awsCmd.AddCommand(aws.AwsConfigGenerateCmd)
 
+	// STS
+	aws.StsInit()
+	awsCmd.AddCommand(aws.StsBulkSendEmailCmd)
 }
