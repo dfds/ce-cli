@@ -54,5 +54,5 @@ jobs:
       - name: "Upload artifacts"
         run: |
           cd builds
-          aws s3 cp --recursive --include "*" . s3://${{ secrets.s3_bucket }}
+          aws s3 cp --acl "public-read" --recursive --include "*" . s3://${{ secrets.s3_bucket }}
         shell: bash
