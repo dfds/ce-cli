@@ -42,6 +42,7 @@ func StsBulkSendEmailCmd(cmd *cobra.Command, args []string) {
 	// get parameters from cobra
 	dataPath, _ := cmd.Flags().GetString("data")
 	templatePath, _ := cmd.Flags().GetString("template")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 	data, err := deserialiseFromFile[data](dataPath)
 	if err != nil {
@@ -77,6 +78,17 @@ func StsBulkSendEmailCmd(cmd *cobra.Command, args []string) {
 		var titleBody bytes.Buffer
 		err = titleTemplateParsed.Execute(&titleBody, templateVars{Vars: entry.Values})
 
+		if dryRun {
+			log.Println("DRY RUN")
+			log.Println(entry)
+
+			fmt.Print("Template rendered:\nSTART --\n\n")
+			fmt.Printf("Title: %s\n", titleBody.String())
+			fmt.Printf("Body: %s\n", body.String())
+			fmt.Print("END --\n\n")
+			continue
+		}
+
 		for _, email := range entry.Emails {
 			err = sendEmail(context.Background(), sesRequest{
 				Msg:    body.String(),
@@ -84,6 +96,7 @@ func StsBulkSendEmailCmd(cmd *cobra.Command, args []string) {
 				From:   "noreply@dfds.cloud",
 				Emails: []string{email},
 			})
+
 			if err != nil {
 				log.Println(fmt.Sprintf("Failed sending email to %s for Capability %s", email, entry.Name))
 				log.Println(err)
