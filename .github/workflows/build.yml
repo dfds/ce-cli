@@ -1,0 +1,58 @@
+name: ce-cli / build
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/build.yml'
+      - 'aws/**'
+      - 'cmd/**'
+      - 'github/**'
+      - 'util/**'
+      - 'main.go'
+      - 'go.*'
+  workflow_dispatch:
+    inputs:
+      deploy:
+        default: false
+        required: false
+        type: boolean
+        description: "Trigger build"
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+
+concurrency:
+  group: 'cecli_build'
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name:  '01 - Linux'
+    runs-on: [ubuntu-22.04]
+    strategy:
+      matrix:
+        arch: ['x86_64']
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: "Build ce-cli"
+        run: sh ./build.sh
+        shell: bash
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.aws_account_id }}:role/gh-ce-cli-pipeline
+          role-session-name: gh-s3-crud
+          aws-region: eu-west-1
+      - name: "Upload artifacts"
+        run: |
+          cd builds
+          aws s3 cp ./* s3://${{ secrets.s3_bucket }}
+        shell: bash
