@@ -1,12 +1,10 @@
 # Cloud Engineering CLI
 
-CLI tool used by DFDS' Cloud Engineering teeam used for mass-manage various cloud resources, e.g. across all AWS accounts in our AWS Organization.
+Internal CLI tool used by DFDS' Cloud Engineering teeam used for mass-manage various cloud resources, e.g. across all AWS accounts in our AWS Organization.
 
 For AWS, the idea more specifically is to have an easy-to-use way of deploying resources, that requires very high privileges - i.e. the ability to assume the organization role in each AWS account.
 
 With this, it's easy to provision IAM roles with lesser privileges that can then be used for various use cases, like running performing inventory of AWS accounts (more or less only `Get*`, `List*`, `Describe*` permissions).
-
-Currently, the only supported resources are AWS-related, and each command therefore will start with `ce aws <command>`.
 
 ## Getting help
 

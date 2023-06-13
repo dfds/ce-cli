@@ -11,8 +11,8 @@ import (
 
 var (
 	// Used for flags.
-	cfgFile     string
-	userLicense string
+	cfgFile string
+	//userLicense string
 
 	rootCmd = &cobra.Command{
 		Use:   "ce",
@@ -42,8 +42,10 @@ func init() {
 
 	awsInit()
 	githubInit()
+	ghSecretsInit()
 	rootCmd.AddCommand(githubCmd)
 	rootCmd.AddCommand(awsCmd)
+	rootCmd.AddCommand(ghSecretsCmd)
 }
 
 func initConfig() {
