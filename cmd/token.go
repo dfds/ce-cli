@@ -28,10 +28,12 @@ func tokenInit() {
 	tokenCmd.PersistentFlags().StringP("tenant", "t", "", "If not using a predefined app, specify a tenant id")
 	tokenCmd.PersistentFlags().StringP("scope", "s", "", "If not using a predefined app, specify scopes, e,g. 'openid,profile'")
 	tokenCmd.PersistentFlags().String("app-id", "", "If not using a predefined app, specify scopes, e,g. 'openid,profile'")
-
+	tokenCmd.PersistentFlags().BoolP("pipe", "p", false, "Output token to stdout")
 }
 
 const defaultTenant = "73a99466-ad05-4221-9f90-e7142aa2f6c1"
+
+var IS_PIPED = false
 
 func tokenCmdFunc(cmd *cobra.Command, args []string) {
 	options := initTokenOptions()
@@ -40,6 +42,8 @@ func tokenCmdFunc(cmd *cobra.Command, args []string) {
 	tenantInput, _ := cmd.Flags().GetString("tenant")
 	scopeInput, _ := cmd.Flags().GetString("scope")
 	appIdInput, _ := cmd.Flags().GetString("app-id")
+	isPiped, err := cmd.Flags().GetBool("pipe")
+	IS_PIPED = isPiped
 
 	if tenantInput == "" {
 		tenantInput = defaultTenant
@@ -120,6 +124,8 @@ func successHandler(resp http.ResponseWriter, req *http.Request) {
 
 	resp.WriteHeader(200)
 	resp.Write(body.Bytes())
+
+	fmt.Print(req.Form.Get("token"))
 
 	go func() {
 		time.Sleep(time.Second * 1)
