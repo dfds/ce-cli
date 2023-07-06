@@ -1,0 +1,17 @@
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body style="background-color: #242424;">
+<div style="display:flex; flex-direction: column; justify-content: center; word-break: break-all; height: 100%; padding-left: 5%; padding-right: 5%; color: #eee; font-size: 1.3rem;">
+<div class="subtitle poi-bg-black poi-color-red" style="width: 190px; padding-right: 20px; padding-left: 15px; padding-top: 3px; padding-bottom: 3px; user-select: none;">
+<span class="poi-color-white"> /// </span>
+<span class="poi-red-text-shadow">ACCESS-TOKEN</span>
+</div>
+<textarea style="display: none; width: 1px;" id="token">{{ .Token }}</textarea>
+<p class="clickable" onclick="copy2clipboard()">{{ .Token }}</p>
+<div class="poi-banner-icon"></div>
+</div>
+
+<script src="funcs.js"></script>
+</body>
+</html>

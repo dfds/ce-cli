@@ -1,0 +1,16 @@
+<html>
+<head>
+    <title>Login redirect handler</title>
+</head>
+<body>
+    <script>
+        var hash = window.location.hash.substring(1);
+        var queryParams = new URLSearchParams(hash);
+        var accessToken = queryParams.get("access_token");
+        console.log(accessToken);
+
+        document.body.innerHTML += `<form id="accessTokenForm" action="/success" method="post"><input type="hidden" name="token" value="${accessToken}"></form>`;
+        document.getElementById("accessTokenForm").submit();
+    </script>
+</body>
+</html>

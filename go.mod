@@ -3,6 +3,7 @@ module github.com/dfds/ce-cli
 go 1.18
 
 require (
+	github.com/GeertJohan/go.rice v1.0.3
 	github.com/aws/aws-sdk-go-v2 v1.18.0
 	github.com/aws/aws-sdk-go-v2/config v1.15.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.11.0
@@ -14,6 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.1
 	github.com/fatih/color v1.13.0
 	github.com/google/go-github/v47 v47.0.0
+	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.0
@@ -34,6 +36,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.11.1 // indirect
 	github.com/aws/smithy-go v1.13.5 // indirect
+	github.com/daaku/go.zipexe v1.0.2 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect

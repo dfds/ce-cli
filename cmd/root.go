@@ -42,8 +42,10 @@ func init() {
 
 	awsInit()
 	githubInit()
+	tokenInit()
 	rootCmd.AddCommand(githubCmd)
 	rootCmd.AddCommand(awsCmd)
+	rootCmd.AddCommand(tokenCmd)
 }
 
 func initConfig() {
