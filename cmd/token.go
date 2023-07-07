@@ -25,9 +25,9 @@ var tokenCmd = &cobra.Command{
 
 func tokenInit() {
 	tokenCmd.PersistentFlags().StringP("app", "a", "", "Pick one of the predefined apps: 'selfservice-portal'")
-	tokenCmd.PersistentFlags().StringP("tenant", "t", "", "If not using a predefined app, specify a tenant id")
+	tokenCmd.PersistentFlags().StringP("tenant", "t", "", "If not using a predefined app, specify a tenant ID")
 	tokenCmd.PersistentFlags().StringP("scope", "s", "", "If not using a predefined app, specify scopes, e,g. 'openid,profile'")
-	tokenCmd.PersistentFlags().String("app-id", "", "If not using a predefined app, specify scopes, e,g. 'openid,profile'")
+	tokenCmd.PersistentFlags().String("app-id", "", "If not using a predefined app, specify Azure app registration ID")
 	tokenCmd.PersistentFlags().BoolP("pipe", "p", false, "Output token to stdout")
 }
 
@@ -57,6 +57,11 @@ func tokenCmdFunc(cmd *cobra.Command, args []string) {
 			fmt.Println("--app value doesn't exist")
 			os.Exit(1)
 		}
+	}
+
+	if appIdInput == "" || scopeInput == "" {
+		fmt.Println("Missing configuration. Make sure --app-id & --scope is specified if not using --app.")
+		os.Exit(1)
 	}
 
 	urlParsed, err := url.Parse(fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/authorize", tenantInput))
