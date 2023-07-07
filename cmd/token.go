@@ -125,7 +125,9 @@ func successHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.WriteHeader(200)
 	resp.Write(body.Bytes())
 
-	fmt.Print(req.Form.Get("token"))
+	if IS_PIPED {
+		fmt.Print(req.Form.Get("token"))
+	}
 
 	go func() {
 		time.Sleep(time.Second * 1)
