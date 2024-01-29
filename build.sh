@@ -11,7 +11,7 @@ init
 
 build_for_platform()
 {
-  GOOS=$1 GOARCH=$2 go build -o builds/ce-$1-$2
+  GOOS=$1 GOARCH=$2 CGO_ENABLED=0 go build -o builds/ce-$1-$2
 }
 
 mkdir -p builds
