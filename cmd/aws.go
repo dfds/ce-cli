@@ -39,5 +39,6 @@ func awsInit() {
 	aws.StsInit()
 	awsCmd.AddCommand(aws.StsBulkSendEmailCmd)
 
+	awsCmd.AddCommand(aws2.GetEc2InstancesCmd)
 	awsCmd.AddCommand(aws2.GetKmsKeysCmd)
 }
