@@ -3,9 +3,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/organizations"
+
 	"github.com/aws/aws-sdk-go-v2/service/organizations/types"
 
 	"github.com/spf13/cobra"
@@ -31,6 +33,27 @@ func OrgAccountListCmd(cmd *cobra.Command, args []string) {
 			fmt.Println(*v.Id)
 		}
 	}
+}
+
+func GetRegions(ctx context.Context) ([]string, error) {
+	regions := []string{}
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+	if err != nil {
+		return regions, err
+	}
+
+	client := ec2.NewFromConfig(cfg)
+
+	resp, err := client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{})
+	if err != nil {
+		return regions, err
+	}
+
+	for _, region := range resp.Regions {
+		regions = append(regions, *region.RegionName)
+	}
+
+	return regions, err
 }
 
 func OrgAccountList(includeAccountIds []string, excludeAccountIds []string) ([]types.Account, error) {

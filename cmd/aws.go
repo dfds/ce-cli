@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	aws2 "github.com/dfds/ce-cli/aws"
 	"github.com/dfds/ce-cli/cmd/aws"
 	"github.com/spf13/cobra"
 )
@@ -37,4 +38,6 @@ func awsInit() {
 	// STS
 	aws.StsInit()
 	awsCmd.AddCommand(aws.StsBulkSendEmailCmd)
+
+	awsCmd.AddCommand(aws2.GetKmsKeysCmd)
 }
