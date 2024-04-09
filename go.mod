@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.8
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.12
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.155.1
+	github.com/aws/aws-sdk-go-v2/service/ecr v1.27.4
 	github.com/aws/aws-sdk-go-v2/service/iam v1.31.3
 	github.com/aws/aws-sdk-go-v2/service/kms v1.30.0
 	github.com/aws/aws-sdk-go-v2/service/organizations v1.27.2
@@ -51,20 +52,16 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
-	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81 // indirect
-	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
