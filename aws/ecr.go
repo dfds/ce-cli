@@ -93,28 +93,90 @@ func UpdateEcrTrustedAccounts(cmd *cobra.Command, args []string) {
 						accountIdsCasted = append(accountIdsCasted, id.(string))
 					}
 
-					fmt.Println(accountIdsCasted)
+					if isStringMissingInArray(accountIdsCasted, "arn:aws:iam::ID:root") {
+						fmt.Println("'ID' is missing in trust, adding")
+						newAccountIdsArray := []string{}
+						newAccountIdsArray = append(newAccountIdsArray, accountIdsCasted...)
+						newAccountIdsArray = append(newAccountIdsArray, "arn:aws:iam::ID:root")
+
+						updatedPolicy := cloneEcrPolicy(parsedPolicy)
+						upPrincipal := make(map[string]interface{})
+						upPrincipal["AWS"] = newAccountIdsArray
+						updatedPolicy.Statement[0].Principal = upPrincipal
+
+						//preUpdate, err := json.MarshalIndent(parsedPolicy, "", "  ")
+						//if err != nil {
+						//	log.Fatal(err)
+						//}
+						//
+						postUpdate, err := json.MarshalIndent(updatedPolicy, "", "  ")
+						if err != nil {
+							log.Fatal(err)
+						}
+						postUpdateString := string(postUpdate)
+
+						fmt.Printf("repo name: %s\n", *policyResp.RepositoryName)
+
+						_, err = client.SetRepositoryPolicy(ctx, &ecr.SetRepositoryPolicyInput{
+							RepositoryName: policyResp.RepositoryName,
+							PolicyText:     &postUpdateString,
+						})
+						if err != nil {
+							log.Fatal(err)
+						}
+
+						//fmt.Printf("ogJson:\n%s\n", *policyResp.PolicyText)
+						//fmt.Printf("pre:\n%s\n", preUpdate)
+						//fmt.Printf("post:\n%s\n", postUpdate)
+						//fmt.Printf("----------\n\n")
+					} else {
+						continue
+					}
+
 					counter = counter + 1
+
+					//if counter == 3 {
+					//	os.Exit(1)
+					//}
 				}
 			}
 		}
 
-		//accountIds := parsedPolicy.Statement[0].Principal.AWS
-		//fmt.Println(accountIds)
 	}
 
 	fmt.Println(counter)
 	os.Exit(1)
 }
 
+func isStringMissingInArray(data []string, compr string) bool {
+	for _, val := range data {
+		if val == compr {
+			return false
+		}
+	}
+	return true
+}
+
+func cloneEcrPolicy(og ecrPolicyJson) ecrPolicyJson {
+	newObj := ecrPolicyJson{
+		Version:   og.Version,
+		Statement: make([]ecrPolicyJsonStatement, len(og.Statement)),
+	}
+
+	_ = copy(newObj.Statement, og.Statement)
+	return newObj
+}
+
 type ecrPolicyJson struct {
-	Version   string `json:"Version"`
-	Statement []struct {
-		Sid       string      `json:"Sid"`
-		Effect    string      `json:"Effect"`
-		Principal interface{} `json:"Principal"`
-		Action    []string    `json:"Action"`
-	} `json:"Statement"`
+	Version   string                   `json:"Version"`
+	Statement []ecrPolicyJsonStatement `json:"Statement"`
+}
+
+type ecrPolicyJsonStatement struct {
+	Sid       string      `json:"Sid"`
+	Effect    string      `json:"Effect"`
+	Principal interface{} `json:"Principal"`
+	Action    []string    `json:"Action"`
 }
 
 type PrincipalString struct {
