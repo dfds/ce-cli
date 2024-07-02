@@ -42,4 +42,6 @@ func awsInit() {
 	awsCmd.AddCommand(aws2.GetEc2InstancesCmd)
 	awsCmd.AddCommand(aws2.GetKmsKeysCmd)
 	awsCmd.AddCommand(aws2.UpdateEcrTrustedAccountsCmd)
+
+	awsCmd.AddCommand(aws2.GetApiGatewayCmd)
 }
