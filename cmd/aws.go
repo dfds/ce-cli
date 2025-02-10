@@ -45,4 +45,5 @@ func awsInit() {
 
 	awsCmd.AddCommand(aws2.GetApiGatewayCmd)
 	awsCmd.AddCommand(aws2.GetDynamoDbTableCmd)
+	awsCmd.AddCommand(aws2.GetResourcesCmd)
 }
