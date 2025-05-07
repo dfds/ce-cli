@@ -47,4 +47,5 @@ func awsInit() {
 	awsCmd.AddCommand(aws2.GetDynamoDbTableCmd)
 	awsCmd.AddCommand(aws2.GetResourcesCmd)
 	awsCmd.AddCommand(aws2.GetRoute53Cmd)
+	awsCmd.AddCommand(aws2.GetS3BucketsCmd)
 }
