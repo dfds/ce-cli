@@ -17,6 +17,9 @@ func StsInit() {
 	StsBulkSendEmailCmd.PersistentFlags().StringP("data", "d", "", "Path to json file containing template variables and various metadata")
 	StsBulkSendEmailCmd.PersistentFlags().StringP("template", "f", "", "Path to message template file")
 	StsBulkSendEmailCmd.PersistentFlags().BoolP("dry-run", "r", false, "Test templating, but don't actually send email")
+	StsBulkSendEmailCmd.PersistentFlags().StringP("type", "", "", "Template format, either 'text' or 'html'")
+
 	cobra.MarkFlagRequired(StsBulkSendEmailCmd.PersistentFlags(), "data")
 	cobra.MarkFlagRequired(StsBulkSendEmailCmd.PersistentFlags(), "template")
+	cobra.MarkFlagRequired(StsBulkSendEmailCmd.PersistentFlags(), "type")
 }

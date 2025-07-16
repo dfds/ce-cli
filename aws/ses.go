@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
@@ -12,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -43,6 +45,7 @@ func StsBulkSendEmailCmd(cmd *cobra.Command, args []string) {
 	dataPath, _ := cmd.Flags().GetString("data")
 	templatePath, _ := cmd.Flags().GetString("template")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	msgType, _ := cmd.Flags().GetString("type")
 
 	data, err := deserialiseFromFile[data](dataPath)
 	if err != nil {
@@ -95,7 +98,7 @@ func StsBulkSendEmailCmd(cmd *cobra.Command, args []string) {
 				Title:  titleBody.String(),
 				From:   "noreply@dfds.cloud",
 				Emails: []string{email},
-			})
+			}, msgType)
 
 			if err != nil {
 				log.Println(fmt.Sprintf("Failed sending email to %s for Capability %s", email, entry.Name))
@@ -110,7 +113,7 @@ func StsBulkSendEmailCmd(cmd *cobra.Command, args []string) {
 
 }
 
-func sendEmail(ctx context.Context, req sesRequest) error {
+func sendEmail(ctx context.Context, req sesRequest, msgType string) error {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("eu-west-1"), config.WithHTTPClient(util.CreateHttpClientWithoutKeepAlive()))
 	if err != nil {
 		return err
@@ -123,14 +126,25 @@ func sendEmail(ctx context.Context, req sesRequest) error {
 		Destination:      &types.Destination{BccAddresses: req.Emails},
 		Content: &types.EmailContent{
 			Simple: &types.Message{
-				Body: &types.Body{Text: &types.Content{
-					Data: &req.Msg,
-				}},
+				Body: &types.Body{},
 				Subject: &types.Content{
 					Data: &req.Title,
 				},
 			},
 		},
+	}
+
+	switch strings.ToLower(msgType) {
+	case "text":
+		input.Content.Simple.Body.Text = &types.Content{
+			Data: &req.Msg,
+		}
+	case "html":
+		input.Content.Simple.Body.Html = &types.Content{
+			Data: &req.Msg,
+		}
+	default:
+		return errors.New("Unsupported message type")
 	}
 
 	output, err := sesClient.SendEmail(ctx, input)
